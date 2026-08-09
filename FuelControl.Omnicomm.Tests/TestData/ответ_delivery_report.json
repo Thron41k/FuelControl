@@ -1,0 +1,98 @@
+﻿{
+  "id": "8616c56f-5e8c-4c8c-b811-84d95ad8cadc",
+  "user_id": 16023301,
+  "is_modified": false,
+  "type": "ASEReport",
+  "params": {
+    "from": 1786201200000,
+    "to": 1786287540000,
+    "params": {
+      "winterOffset": 540,
+      "summerOffset": 540,
+      "page": 1,
+      "rows": 100,
+      "from": 1786201200000,
+      "to": 1786287540000,
+      "action": "getReportDataDlv",
+      "newui": true,
+      "userID": 1005704,
+      "repConfigId": 7380,
+      "locale": "ru",
+      "reportFromdate": 1786201200000,
+      "fromDatetime": 1786201200000,
+      "reportTodate": 1786287540000,
+      "toDatetime": 1786287540000,
+      "selectedRoots": [ "FTC" ],
+      "group": [ "Могочинский" ],
+      "ID": [ 303013526 ],
+      "vehicleID": [ 303013526 ],
+      "tz": "Asia/Chita",
+      "objectType": [ "FTC" ],
+      "objectClass": [ 1 ],
+      "service": false
+    },
+    "url": "/delivery",
+    "method": "POST",
+    "traditional": true,
+    "_user_id": 16023301,
+    "_server": "meridian"
+  },
+  "expire_date": "2026-08-09T06:46:31.807Z",
+  "status": "SUCCESS",
+  "created_at": "2026-08-09T06:45:31.807Z",
+  "results": {
+    "userdata": {
+      "cursorRowNumber": 0,
+      "reportDescriptor": {
+        "dependencyType": "datetime",
+        "reportTypeID": 2,
+        "objectTypes": ",FTC"
+      }
+    },
+    "total": 1,
+    "records": 46,
+    "page": 1,
+    "rows": [
+      {
+        "volume": 19983,
+        "enddate": 1786228169000,
+        "name": "Топливозаправщик КамАЗ К 129 ЕВ 2",
+        "id": 1,
+        "vehicleid": 303013526,
+        "startdate": 1786228019000
+      },
+      {
+        "volume": 19441,
+        "enddate": 1786228394000,
+        "name": "Топливозаправщик КамАЗ К 129 ЕВ 2",
+        "id": 2,
+        "vehicleid": 303013526,
+        "startdate": 1786228214000
+      },
+      {
+        "volume": 8594,
+        "enddate": 1786228754000,
+        "name": "Топливозаправщик КамАЗ К 129 ЕВ 2",
+        "id": 3,
+        "vehicleid": 303013526,
+        "startdate": 1786228709000
+      },
+      {
+        "volume": 116297,
+        "enddate": 1786244864000,
+        "name": "Топливозаправщик КамАЗ К 129 ЕВ 2",
+        "id": 37,
+        "vehicleid": 303013526,
+        "startdate": 1786244054000
+      },
+      {
+        "volume": 423,
+        "enddate": 1786256979000,
+        "name": "Топливозаправщик КамАЗ К 129 ЕВ 2",
+        "id": 46,
+        "vehicleid": 303013526,
+        "startdate": 1786256964000
+      }
+    ]
+  }
+}

@@ -1,0 +1,221 @@
+﻿@page "/Account/Login"
+@layout AuthLayout
+@using System.ComponentModel.DataAnnotations
+@using FuelControl.Components.Layout
+@using FuelControl.Data
+@using Microsoft.AspNetCore.Identity
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Вход — FuelControl</PageTitle>
+
+<div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center bg-light">
+
+    ```
+    <div class="row w-100 justify-content-center">
+
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body p-4 p-md-5">
+
+                    <div class="text-center mb-4">
+
+                        <div class="d-inline-flex align-items-center justify-content-center
+                                bg-primary text-white rounded-3
+                                mb-3"
+                             style="width: 64px; height: 64px;">
+
+                            <span class="fs-4 fw-bold">
+                                FC
+                            </span>
+
+                        </div>
+
+                        <h1 class="h3 fw-bold text-primary mb-1">
+                            FuelControl
+                        </h1>
+
+                        <p class="text-secondary mb-0">
+                            Система учёта заправок
+                        </p>
+
+                    </div>
+
+                    <EditForm Model="Input"
+                              OnValidSubmit="LoginUser"
+                              FormName="login">
+
+                        <DataAnnotationsValidator />
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger"
+                                 role="alert">
+
+                                @errorMessage
+
+                            </div>
+                        }
+
+                        <div class="mb-3">
+
+                            <label for="email"
+                                   class="form-label fw-semibold">
+
+                                Электронная почта
+
+                            </label>
+
+                            <InputText id="email"
+                                       class="form-control form-control-lg"
+                                       @bind-Value="Input.Email"
+                                       autocomplete="username"
+                                       placeholder="Введите email" />
+
+                            <ValidationMessage For="() => Input.Email"
+                                               class="text-danger small" />
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label for="password"
+                                   class="form-label fw-semibold">
+
+                                Пароль
+
+                            </label>
+
+                            <InputText id="password"
+                                       type="password"
+                                       class="form-control form-control-lg"
+                                       @bind-Value="Input.Password"
+                                       autocomplete="current-password"
+                                       placeholder="Введите пароль" />
+
+                            <ValidationMessage For="() => Input.Password"
+                                               class="text-danger small" />
+
+                        </div>
+
+                        <div class="form-check mb-4">
+
+                            <InputCheckbox id="remember-me"
+                                           class="form-check-input"
+                                           @bind-Value="Input.RememberMe" />
+
+                            <label class="form-check-label"
+                                   for="remember-me">
+
+                                Запомнить меня
+
+                            </label>
+
+                        </div>
+
+                        <button type="submit"
+                                class="btn btn-primary btn-lg w-100">
+
+                            Войти
+
+                        </button>
+
+                    </EditForm>
+
+                </div>
+
+                <div class="card-footer bg-white border-0 text-center pb-4">
+
+                    <small class="text-secondary">
+                        FuelControl
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email,
+            Input.Password,
+            Input.RememberMe,
+            lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation(
+                "User logged in.");
+
+            RedirectManager.RedirectTo(
+                ReturnUrl ?? "/");
+
+            return;
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo(
+                "/Account/LoginWith2fa",
+                new Dictionary<string, object?>
+                {
+                    ["ReturnUrl"] = ReturnUrl,
+                    ["RememberMe"] = Input.RememberMe
+                });
+
+            return;
+        }
+
+        if (result.IsLockedOut)
+        {
+            Logger.LogWarning(
+                "User account is locked out.");
+
+            RedirectManager.RedirectTo(
+                "/Account/Lockout");
+
+            return;
+        }
+
+        errorMessage =
+            "Неверный адрес электронной почты или пароль.";
+    }
+
+    private sealed class InputModel
+    {
+        [Required(
+            ErrorMessage = "Введите адрес электронной почты.")]
+        [EmailAddress(
+            ErrorMessage = "Введите корректный адрес электронной почты.")]
+        public string Email { get; set; } = "";
+
+        [Required(
+            ErrorMessage = "Введите пароль.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        public bool RememberMe { get; set; }
+    }
+
+}
