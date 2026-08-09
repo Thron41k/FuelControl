@@ -1,87 +1,100 @@
 ﻿@implements IDisposable
-
 @inject NavigationManager NavigationManager
 
-<div class="top-row ps-3 navbar navbar-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-fuelcontrol navbar-fuelcontrol">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">FuelControl</a>
+        <a class="navbar-brand" href="/">FuelControl</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 align-items-center">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/refuels" Match="NavLinkMatch.Prefix">
+                        <span class="bi bi-list-ul" aria-hidden="true"></span> Просмотр заправок
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/refuels/add">
+                        <span class="bi bi-plus-circle" aria-hidden="true"></span> Добавление заправок
+                    </NavLink>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle @(isDropdownActive ? "active" : "")"
+                       href="#" id="navbarDropdown" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="bi bi-book" aria-hidden="true"></span> Справочники
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                        <li><NavLink class="dropdown-item" href="/tankers">Топливозаправщики</NavLink></li>
+                        <li><NavLink class="dropdown-item" href="/drivers">Водители</NavLink></li>
+                        <li><NavLink class="dropdown-item" href="/vehicles">Техника</NavLink></li>
+                    </ul>
+                </li>
+            </ul>
+
+            <ul class="navbar-nav align-items-center">
+                <AuthorizeView>
+                    <Authorized>
+                        <li class="nav-item me-2">
+                            <span class="navbar-text text-light">
+                                <span class="bi bi-person-fill" aria-hidden="true"></span>
+                                @context.User.Identity?.Name
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <form action="Account/Logout" method="post" class="d-inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="btn btn-outline-light btn-sm">
+                                    <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Выход
+                                </button>
+                            </form>
+                        </li>
+                    </Authorized>
+                    <NotAuthorized>
+                        <li class="nav-item">
+                            <NavLink class="nav-link text-light" href="Account/Register">
+                                <span class="bi bi-person-plus" aria-hidden="true"></span> Регистрация
+                            </NavLink>
+                        </li>
+                        <li class="nav-item">
+                            <NavLink class="nav-link text-light" href="Account/Login">
+                                <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Вход
+                            </NavLink>
+                        </li>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </ul>
+        </div>
     </div>
-</div>
-
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div>
-
-        <AuthorizeView>
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
+</nav>
 
 @code {
     private string? currentUrl;
+    private bool isDropdownActive;
 
     protected override void OnInitialized()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+        UpdateDropdownState();
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        UpdateDropdownState();
         StateHasChanged();
+    }
+
+    private void UpdateDropdownState()
+    {
+        isDropdownActive = currentUrl?.StartsWith("tankers") == true ||
+                           currentUrl?.StartsWith("drivers") == true ||
+                           currentUrl?.StartsWith("vehicles") == true;
     }
 
     public void Dispose()
@@ -89,4 +102,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-
