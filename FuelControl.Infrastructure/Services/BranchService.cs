@@ -2,6 +2,7 @@
 using FuelControl.Infrastructure.Identity;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
+using FuelControl.Infrastructure.Services.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,6 +60,53 @@ public sealed class BranchService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return branch.Id;
+    }
+
+    public async Task ImportFromOmnicommAsync(
+        IReadOnlyList<OmnicommBranchImportModel> branches,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAdminAsync();
+
+        foreach (var item in branches)
+        {
+            var name = NormalizeName(item.Name);
+
+            var branch = await dbContext.Set<Branch>()
+                .SingleOrDefaultAsync(
+                    x => x.OmnicommId == item.OmnicommId,
+                    cancellationToken);
+
+            if (branch is not null)
+            {
+                if (branch.Name != name)
+                {
+                    branch.Rename(name);
+                }
+
+                continue;
+            }
+
+            var localBranch = await dbContext.Set<Branch>()
+                .SingleOrDefaultAsync(
+                    x => x.Name == name &&
+                         x.OmnicommId == null,
+                    cancellationToken);
+
+            if (localBranch is not null)
+            {
+                localBranch.SetOmnicommId(item.OmnicommId);
+                continue;
+            }
+
+            var newBranch = new Branch(name);
+
+            newBranch.SetOmnicommId(item.OmnicommId);
+
+            dbContext.Set<Branch>().Add(newBranch);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateAsync(

@@ -5,7 +5,7 @@
         public Guid Id { get; private set; }
 
         public string Name { get; private set; } = null!;
-
+        public long? OmnicommId { get; private set; }
         private Branch()
         {
         }
@@ -29,6 +29,10 @@
                     nameof(name));
 
             Name = name;
+        }
+        public void SetOmnicommId(long? omnicommId)
+        {
+            OmnicommId = omnicommId;
         }
     }
 }

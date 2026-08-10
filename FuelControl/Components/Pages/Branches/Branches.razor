@@ -4,11 +4,14 @@
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
+@using FuelControl.Infrastructure.Services.Models
+@using FuelControl.Omnicomm.Vehicles.Models
 @using Microsoft.AspNetCore.Authorization
 
 @attribute [Authorize]
 
 @inject IBranchService BranchService
+@inject IOmnicommBranchService OmnicommBranchService
 
 <PageTitle>Филиалы</PageTitle>
 
@@ -27,18 +30,50 @@
         </div>
 
         <AuthorizeView Roles="@Roles.Admin">
-            <ChildContent>
-                <button class="btn btn-primary"
-                        @onclick="OpenCreateDialog">
+            <ChildContent Context="adminContext">
 
-                    <span class="bi bi-plus-lg me-1"></span>
+                <div class="d-flex gap-2">
 
-                    Добавить
-                </button>
+                    <button class="btn btn-outline-primary"
+                            @onclick="OpenOmnicommDialog">
+
+                        <span class="bi bi-cloud-download me-1"></span>
+
+                        Из Omnicomm
+
+                    </button>
+
+                    <button class="btn btn-primary"
+                            @onclick="OpenCreateDialog">
+
+                        <span class="bi bi-plus-lg me-1"></span>
+
+                        Добавить
+
+                    </button>
+
+                </div>
+
             </ChildContent>
         </AuthorizeView>
 
     </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+
+            @ErrorMessage
+
+            <button type="button"
+                    class="btn-close"
+                    @onclick="() => ErrorMessage = null">
+            </button>
+
+        </div>
+    }
 
 
     <div class="card shadow-sm">
@@ -77,11 +112,17 @@
                             Филиал
                         </th>
 
+                        <th>
+                            Omnicomm
+                        </th>
+
                         <AuthorizeView Roles="@Roles.Admin">
-                            <ChildContent>
+                            <ChildContent Context="adminContext">
+
                                 <th class="text-end">
                                     Действия
                                 </th>
+
                             </ChildContent>
                         </AuthorizeView>
 
@@ -95,7 +136,7 @@
                     {
                         <tr>
 
-                            <td colspan="2"
+                            <td colspan="3"
                                 class="text-center py-5">
 
                                 <div class="spinner-border"
@@ -115,7 +156,7 @@
                     {
                         <tr>
 
-                            <td colspan="2"
+                            <td colspan="3"
                                 class="text-center text-muted py-5">
 
                                 Филиалы не найдены.
@@ -131,13 +172,37 @@
                             <tr>
 
                                 <td>
+
                                     <strong>
                                         @branch.Name
                                     </strong>
+
                                 </td>
 
+                                <td>
+
+                                    @if (branch.OmnicommId is not null)
+                                    {
+                                        <span class="badge text-bg-success">
+
+                                            <span class="bi bi-check-lg me-1"></span>
+
+                                            @branch.OmnicommId
+
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">
+                                            Не связан
+                                        </span>
+                                    }
+
+                                </td>
+
+
                                 <AuthorizeView Roles="@Roles.Admin">
-                                    <ChildContent>
+                                    <ChildContent Context="adminContext">
 
                                         <td class="text-end">
 
@@ -203,10 +268,10 @@
                         <h5 class="modal-title">
 
                             @(EditingBranch is null
-                                                    ? "Добавление филиала"
-                                                    : "Редактирование филиала")
+                                ? "Добавление филиала"
+                                : "Редактирование филиала")
 
-                    </h5>
+                        </h5>
 
                         <button type="button"
                                 class="btn-close"
@@ -218,7 +283,7 @@
 
                     <div class="modal-body">
 
-                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
                         {
                             <div class="alert alert-danger">
                                 @ErrorMessage
@@ -277,6 +342,232 @@
 }
 
 
+@if (ShowOmnicommDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Добавление филиалов из Omnicomm
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseOmnicommDialog"
+                            disabled="@IsImportingOmnicomm">
+                    </button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(
+                        OmnicommErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+
+                            @OmnicommErrorMessage
+
+                        </div>
+                    }
+
+
+                    @if (IsLoadingOmnicomm)
+                    {
+                        <div class="text-center py-5">
+
+                            <div class="spinner-border"
+                                 role="status">
+
+                                <span class="visually-hidden">
+                                    Загрузка...
+                                </span>
+
+                            </div>
+
+                            <div class="mt-3 text-muted">
+                                Получение филиалов из Omnicomm...
+                            </div>
+
+                        </div>
+                    }
+                    else if (!OmnicommBranches.Any())
+                    {
+                        <div class="text-center text-muted py-5">
+
+                            Филиалы в Omnicomm не найдены.
+
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+
+                            <table class="table table-hover align-middle">
+
+                                <thead class="table-light">
+
+                                    <tr>
+
+                                        <th style="width: 50px;">
+                                        </th>
+
+                                        <th>
+                                            Филиал
+                                        </th>
+
+                                        <th>
+                                            Omnicomm ID
+                                        </th>
+
+                                        <th>
+                                            Состояние
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var omnicommBranch
+                                        in OmnicommBranches)
+                                    {
+                                        var localBranch =
+                                            FindLocalBranch(
+                                                omnicommBranch.Id);
+
+                                        var alreadyImported =
+                                            localBranch is not null;
+
+                                        <tr>
+
+                                            <td>
+
+                                                @if (!alreadyImported)
+                                                {
+                                                    <input class="form-check-input"
+                                                           type="checkbox"
+                                                           checked="@SelectedOmnicommBranchIds.Contains(omnicommBranch.Id)"
+                                                           @onchange="() => ToggleOmnicommBranch(omnicommBranch.Id)" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-success">
+
+                                                        <span class="bi bi-check-circle-fill">
+                                                        </span>
+
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                            <td>
+
+                                                <strong>
+                                                    @omnicommBranch.Name
+                                                </strong>
+
+                                                @if (omnicommBranch.ChildGroupIds.Count > 0)
+                                                {
+                                                    <div class="small text-muted">
+
+                                                        Дочерних групп:
+                                                        @omnicommBranch.ChildGroupIds.Count
+
+                                                    </div>
+                                                }
+
+                                            </td>
+
+                                            <td>
+                                                @omnicommBranch.Id
+                                            </td>
+
+                                            <td>
+
+                                                @if (alreadyImported)
+                                                {
+                                                    <span class="badge text-bg-success">
+
+                                                        Уже добавлен
+
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-secondary">
+
+                                                        Не добавлен
+
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    }
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseOmnicommDialog"
+                            disabled="@IsImportingOmnicomm">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="ImportOmnicommBranches"
+                            disabled="@(IsImportingOmnicomm ||
+                                                                   SelectedOmnicommBranchIds.Count == 0)">
+
+                        @if (IsImportingOmnicomm)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1">
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="bi bi-cloud-download me-1">Импортировать</span>
+
+                            
+                        }
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
 @code {
 
     private IReadOnlyList<Branch> BranchList = [];
@@ -295,6 +586,19 @@
     private BranchEditModel EditModel = new();
 
 
+    private bool ShowOmnicommDialog;
+
+    private bool IsLoadingOmnicomm;
+
+    private bool IsImportingOmnicomm;
+
+    private IReadOnlyList<OmnicommGroup> OmnicommBranches = [];
+
+    private HashSet<long> SelectedOmnicommBranchIds = [];
+
+    private string? OmnicommErrorMessage;
+
+
     private IEnumerable<Branch> FilteredBranches =>
         BranchList.Where(MatchesSearch);
 
@@ -308,6 +612,7 @@
     private async Task LoadBranchesAsync()
     {
         IsLoading = true;
+
         ErrorMessage = null;
 
         try
@@ -331,6 +636,13 @@
         return branch.Name.Contains(
             SearchText.Trim(),
             StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    private Branch? FindLocalBranch(long omnicommId)
+    {
+        return BranchList.FirstOrDefault(
+            x => x.OmnicommId == omnicommId);
     }
 
 
@@ -374,6 +686,7 @@
     private async Task SaveBranch()
     {
         IsSaving = true;
+
         ErrorMessage = null;
 
         try
@@ -427,6 +740,120 @@
         catch (InvalidOperationException ex)
         {
             ErrorMessage = ex.Message;
+        }
+    }
+
+
+    private async Task OpenOmnicommDialog()
+    {
+        ShowOmnicommDialog = true;
+
+        IsLoadingOmnicomm = true;
+
+        OmnicommErrorMessage = null;
+
+        OmnicommBranches = [];
+
+        SelectedOmnicommBranchIds.Clear();
+
+        try
+        {
+            OmnicommBranches =
+                await OmnicommBranchService.GetBranchesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            OmnicommErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            OmnicommErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            OmnicommErrorMessage =
+                $"Не удалось получить филиалы из Omnicomm: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingOmnicomm = false;
+        }
+    }
+
+
+    private void CloseOmnicommDialog()
+    {
+        if (IsImportingOmnicomm)
+        {
+            return;
+        }
+
+        ShowOmnicommDialog = false;
+
+        OmnicommBranches = [];
+
+        SelectedOmnicommBranchIds.Clear();
+
+        OmnicommErrorMessage = null;
+    }
+
+
+    private void ToggleOmnicommBranch(long id)
+    {
+        if (!SelectedOmnicommBranchIds.Add(id))
+        {
+            SelectedOmnicommBranchIds.Remove(id);
+        }
+    }
+
+
+    private async Task ImportOmnicommBranches()
+    {
+        var selected = OmnicommBranches
+            .Where(x =>
+                SelectedOmnicommBranchIds.Contains(x.Id))
+            .Select(x =>
+                new OmnicommBranchImportModel(
+                    x.Id,
+                    x.Name))
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            OmnicommErrorMessage =
+                "Выберите хотя бы один филиал.";
+
+            return;
+        }
+
+        IsImportingOmnicomm = true;
+
+        OmnicommErrorMessage = null;
+
+        try
+        {
+            await BranchService.ImportFromOmnicommAsync(
+                selected);
+
+            ShowOmnicommDialog = false;
+
+            OmnicommBranches = [];
+
+            SelectedOmnicommBranchIds.Clear();
+
+            await LoadBranchesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            OmnicommErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            OmnicommErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsImportingOmnicomm = false;
         }
     }
 

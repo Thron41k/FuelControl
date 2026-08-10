@@ -1,4 +1,5 @@
 ﻿using FuelControl.Domain.Entities;
+using FuelControl.Infrastructure.Services.Models;
 
 namespace FuelControl.Infrastructure.Services.Interfaces;
 
@@ -22,5 +23,9 @@ public interface IBranchService
 
     Task DeleteAsync(
         Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task ImportFromOmnicommAsync(
+        IReadOnlyList<OmnicommBranchImportModel> branches,
         CancellationToken cancellationToken = default);
 }

@@ -21,5 +21,11 @@ public sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
 
         builder.HasIndex(x => x.Name)
             .IsUnique();
+
+        builder.Property(x => x.OmnicommId)
+            .IsRequired(false);
+
+        builder.HasIndex(x => x.OmnicommId)
+            .IsUnique();
     }
 }
