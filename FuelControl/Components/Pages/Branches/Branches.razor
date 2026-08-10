@@ -1,0 +1,443 @@
+﻿@page "/branches"
+@rendermode InteractiveServer
+
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
+@using FuelControl.Infrastructure.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
+
+@inject IBranchService BranchService
+
+<PageTitle>Филиалы</PageTitle>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h1 class="h3 mb-1">
+                Филиалы
+            </h1>
+
+            <div class="text-muted">
+                Справочник филиалов
+            </div>
+        </div>
+
+        <AuthorizeView Roles="@Roles.Admin">
+            <ChildContent>
+                <button class="btn btn-primary"
+                        @onclick="OpenCreateDialog">
+
+                    <span class="bi bi-plus-lg me-1"></span>
+
+                    Добавить
+                </button>
+            </ChildContent>
+        </AuthorizeView>
+
+    </div>
+
+
+    <div class="card shadow-sm">
+
+        <div class="card-body border-bottom">
+
+            <div class="row g-3">
+
+                <div class="col-12 col-lg-6">
+
+                    <label class="form-label">
+                        Поиск
+                    </label>
+
+                    <input class="form-control"
+                           placeholder="Название филиала"
+                           @bind="SearchText"
+                           @bind:event="oninput" />
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+
+                    <tr>
+
+                        <th>
+                            Филиал
+                        </th>
+
+                        <AuthorizeView Roles="@Roles.Admin">
+                            <ChildContent>
+                                <th class="text-end">
+                                    Действия
+                                </th>
+                            </ChildContent>
+                        </AuthorizeView>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    @if (IsLoading)
+                    {
+                        <tr>
+
+                            <td colspan="2"
+                                class="text-center py-5">
+
+                                <div class="spinner-border"
+                                     role="status">
+
+                                    <span class="visually-hidden">
+                                        Загрузка...
+                                    </span>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+                    }
+                    else if (!FilteredBranches.Any())
+                    {
+                        <tr>
+
+                            <td colspan="2"
+                                class="text-center text-muted py-5">
+
+                                Филиалы не найдены.
+
+                            </td>
+
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var branch in FilteredBranches)
+                        {
+                            <tr>
+
+                                <td>
+                                    <strong>
+                                        @branch.Name
+                                    </strong>
+                                </td>
+
+                                <AuthorizeView Roles="@Roles.Admin">
+                                    <ChildContent>
+
+                                        <td class="text-end">
+
+                                            <div class="btn-group">
+
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => OpenEditDialog(branch)">
+
+                                                    <span class="bi bi-pencil me-1"></span>
+
+                                                    Изменить
+
+                                                </button>
+
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        @onclick="() => DeleteBranch(branch)">
+
+                                                    <span class="bi bi-trash me-1"></span>
+
+                                                    Удалить
+
+                                                </button>
+
+                                            </div>
+
+                                        </td>
+
+                                    </ChildContent>
+                                </AuthorizeView>
+
+                            </tr>
+                        }
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+@if (ShowDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <EditForm Model="EditModel"
+                          OnValidSubmit="SaveBranch">
+
+                    <DataAnnotationsValidator />
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+
+                            @(EditingBranch is null
+                                                    ? "Добавление филиала"
+                                                    : "Редактирование филиала")
+
+                    </h5>
+
+                        <button type="button"
+                                class="btn-close"
+                                @onclick="CloseDialog">
+                        </button>
+
+                    </div>
+
+
+                    <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                        {
+                            <div class="alert alert-danger">
+                                @ErrorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Название филиала
+                            </label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="EditModel.Name" />
+
+                            <ValidationMessage For="() => EditModel.Name" />
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="modal-footer">
+
+                        <button type="button"
+                                class="btn btn-secondary"
+                                @onclick="CloseDialog">
+
+                            Отмена
+
+                        </button>
+
+                        <button type="submit"
+                                class="btn btn-primary"
+                                disabled="@IsSaving">
+
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1">
+                                </span>
+                            }
+
+                            Сохранить
+
+                        </button>
+
+                    </div>
+
+                </EditForm>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+@code {
+
+    private IReadOnlyList<Branch> BranchList = [];
+
+    private bool IsLoading;
+    private bool IsSaving;
+
+    private string SearchText = string.Empty;
+
+    private bool ShowDialog;
+
+    private Branch? EditingBranch;
+
+    private string? ErrorMessage;
+
+    private BranchEditModel EditModel = new();
+
+
+    private IEnumerable<Branch> FilteredBranches =>
+        BranchList.Where(MatchesSearch);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranchesAsync();
+    }
+
+
+    private async Task LoadBranchesAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            BranchList = await BranchService.GetAllAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
+    private bool MatchesSearch(Branch branch)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            return true;
+        }
+
+        return branch.Name.Contains(
+            SearchText.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    private void OpenCreateDialog()
+    {
+        EditingBranch = null;
+
+        EditModel = new BranchEditModel();
+
+        ErrorMessage = null;
+
+        ShowDialog = true;
+    }
+
+
+    private void OpenEditDialog(Branch branch)
+    {
+        EditingBranch = branch;
+
+        EditModel = new BranchEditModel
+        {
+            Name = branch.Name
+        };
+
+        ErrorMessage = null;
+
+        ShowDialog = true;
+    }
+
+
+    private void CloseDialog()
+    {
+        ShowDialog = false;
+
+        EditingBranch = null;
+
+        ErrorMessage = null;
+    }
+
+
+    private async Task SaveBranch()
+    {
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            if (EditingBranch is null)
+            {
+                await BranchService.CreateAsync(
+                    EditModel.Name);
+            }
+            else
+            {
+                await BranchService.UpdateAsync(
+                    EditingBranch.Id,
+                    EditModel.Name);
+            }
+
+            CloseDialog();
+
+            await LoadBranchesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+
+    private async Task DeleteBranch(Branch branch)
+    {
+        ErrorMessage = null;
+
+        try
+        {
+            await BranchService.DeleteAsync(
+                branch.Id);
+
+            await LoadBranchesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+
+    private sealed class BranchEditModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(
+            ErrorMessage = "Введите название филиала.")]
+
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+
+        public string Name { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,787 @@
+﻿@page "/vehicles"
+@rendermode InteractiveServer
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
+@using FuelControl.Infrastructure.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = $"{Roles.Admin},{Roles.Dispatcher}")]
+
+@inject IVehicleService VehicleService
+@inject IBranchService BranchService
+@inject NavigationManager Navigation
+
+<PageTitle>Техника</PageTitle>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Техника</h1>
+            <div class="text-muted">
+                Справочник техники
+            </div>
+        </div>
+
+        <button class="btn btn-primary"
+                @onclick="OpenCreateDialog">
+            <span class="bi bi-plus-lg me-1"></span>
+            Добавить
+        </button>
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-body border-bottom">
+
+            <div class="row g-3 align-items-end">
+
+                <div class="col-12 col-lg-5">
+                    <label class="form-label">
+                        Поиск
+                    </label>
+
+                    <input class="form-control"
+                           placeholder="Название, госномер, инв. №"
+                           @bind="SearchText"
+                           @bind:event="oninput" />
+                </div>
+
+                <div class="col-12 col-lg-3">
+                    <label class="form-label">
+                        Статус
+                    </label>
+                    <select class="form-select"
+                            value="@StatusFilter"
+                            @onchange="OnStatusChanged">
+                        <option value="Active">
+                            Активные
+                        </option>
+
+                        <option value="All">
+                            Все
+                        </option>
+
+                        <option value="Inactive">
+                            Неактивные
+                        </option>
+                    </select>
+                </div>
+
+                <AuthorizeView Roles="@Roles.Admin">
+                    <ChildContent>
+
+                        <div class="col-12 col-lg-4">
+
+                            <label class="form-label">
+                                Филиал
+                            </label>
+
+                            <select class="form-select"
+                                    @bind="SelectedBranchId">
+
+                                <option value="">
+                                    Все филиалы
+                                </option>
+
+                                @foreach (var branch in Branches)
+                                {
+                                    <option value="@branch.Id">
+                                        @branch.Name
+                                    </option>
+                                }
+
+                            </select>
+
+                        </div>
+
+                    </ChildContent>
+                </AuthorizeView>
+
+            </div>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>
+                            Филиал
+                        </th>
+
+                        <th>
+                            Техника
+                        </th>
+
+                        <th>
+                            Госномер
+                        </th>
+
+                        <th>
+                            Статус
+                        </th>
+
+                        <th class="text-end">
+                            Действия
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @if (IsLoading)
+                    {
+                        <tr>
+                            <td colspan="6"
+                                class="text-center py-5">
+
+                                <div class="spinner-border"
+                                     role="status">
+
+                                    <span class="visually-hidden">
+                                        Загрузка...
+                                    </span>
+
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else if (!FilteredVehicles.Any())
+                    {
+                        <tr>
+                            <td colspan="6"
+                                class="text-center text-muted py-5">
+
+                                Техника не найдена.
+
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var vehicle in FilteredVehicles)
+                        {
+                            <tr>
+
+                                <td>
+                                    @vehicle.Branch.Name
+                                </td>
+
+                                <td>
+                                    <strong>
+                                        @vehicle.Name
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    @vehicle.RegistrationNumber
+                                </td>
+
+                                
+
+                                <td>
+
+                                    @if (vehicle.IsActive)
+                                    {
+                                        <span class="badge text-bg-success">
+                                            Активна
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-secondary">
+                                            Отключена
+                                        </span>
+                                    }
+
+                                </td>
+
+                                <td class="text-end">
+
+                                    <div class="btn-group">
+
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                @onclick="() => OpenEditDialog(vehicle)">
+                                            <span class="bi bi-pencil"></span>
+                                            Изменить
+                                        </button>
+
+                                        @if (vehicle.IsActive)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => Deactivate(vehicle)">
+                                                <span class="bi bi-power"></span>
+                                                Отключить
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-success"
+                                                    @onclick="() => Activate(vehicle)">
+                                                <span class="bi bi-power"></span>
+                                                Включить
+                                            </button>
+                                        }
+                                        @if (!vehicle.IsActive)
+                                        {
+                                            <AuthorizeView Roles="@Roles.Admin">
+                                                <ChildContent Context="adminContext">
+
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => OpenDeleteDialog(vehicle)">
+
+                                                        <span class="bi bi-trash"></span>
+                                                        Удалить
+
+                                                    </button>
+
+                                                </ChildContent>
+                                            </AuthorizeView>
+                                        }
+                                    </div>
+
+                                </td>
+
+                            </tr>
+                        }
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+@if (ShowDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        @(EditingVehicle is null
+                                            ? "Добавление техники"
+                                            : "Редактирование техники")
+                </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseDialog">
+                    </button>
+
+                </div>
+
+                <EditForm Model="EditModel"
+                          OnValidSubmit="SaveVehicle">
+
+                    <DataAnnotationsValidator />
+
+                    <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                        {
+                            <div class="alert alert-danger">
+                                @ErrorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Техника
+                            </label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="EditModel.Name" />
+
+                            <ValidationMessage For="() => EditModel.Name" />
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Госномер
+                            </label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="EditModel.RegistrationNumber" />
+
+                            <ValidationMessage For="() => EditModel.RegistrationNumber" />
+
+                        </div>
+
+                        <AuthorizeView Roles="@Roles.Admin">
+                            <ChildContent Context="adminContext">
+
+                                <div class="mb-3">
+
+                                    <label class="form-label">
+                                        Филиал
+                                    </label>
+
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="EditModel.BranchId">
+
+                                        <option value="">
+                                            Выберите филиал
+                                        </option>
+
+                                        @foreach (var branch in Branches)
+                                        {
+                                            <option value="@branch.Id">
+                                                @branch.Name
+                                            </option>
+                                        }
+
+                                    </InputSelect>
+
+                                    <ValidationMessage
+                                        For="() => EditModel.BranchId" />
+
+                                </div>
+
+                            </ChildContent>
+                        </AuthorizeView>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button type="button"
+                                class="btn btn-secondary"
+                                @onclick="CloseDialog">
+                            Отмена
+                        </button>
+
+                        <button type="submit"
+                                class="btn btn-primary"
+                                disabled="@IsSaving">
+
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+
+                            Сохранить
+
+                        </button>
+
+                    </div>
+
+                </EditForm>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@if (ShowDeleteDialog && VehicleToDelete is not null)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Удаление техники
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseDeleteDialog"
+                            disabled="@IsDeleting">
+                    </button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @ErrorMessage
+                        </div>
+                    }
+
+                    <p>
+                        Вы действительно хотите удалить технику?
+                    </p>
+
+                    <div class="border rounded p-3 bg-light">
+
+                        <div class="fw-semibold">
+                            @VehicleToDelete.Name
+                        </div>
+
+                        <div class="text-muted">
+                            Госномер:
+                            @VehicleToDelete.RegistrationNumber
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(
+                                            VehicleToDelete.InventoryNumber))
+                        {
+                            <div class="text-muted">
+                                Инвентарный №:
+                                @VehicleToDelete.InventoryNumber
+                            </div>
+                        }
+
+                    </div>
+
+                    <div class="alert alert-warning mt-3 mb-0">
+
+                        <span class="bi bi-exclamation-triangle me-1"></span>
+
+                        Внимание! Удаление необратимо.
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseDeleteDialog"
+                            disabled="@IsDeleting">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="ConfirmDeleteVehicle"
+                            disabled="@IsDeleting">
+
+                        @if (IsDeleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"
+                                  role="status">
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="bi bi-trash me-1">Удалить</span>
+                        }
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+@code {
+    private bool ShowDeleteDialog;
+
+    private Vehicle? VehicleToDelete;
+
+    private bool IsDeleting;
+    private IReadOnlyList<Vehicle> VehicleList = [];
+    private IReadOnlyList<Branch> Branches = [];
+
+    private bool IsLoading;
+    private bool IsSaving;
+
+    private string SearchText = string.Empty;
+
+    private string StatusFilter = "Active";
+
+    private Guid? SelectedBranchId;
+
+    private bool ShowDialog;
+
+    private Vehicle? EditingVehicle;
+
+    private string? ErrorMessage;
+
+    private VehicleEditModel EditModel = new();
+
+    private IEnumerable<Vehicle> FilteredVehicles =>
+        VehicleList
+            .Where(MatchesSearch)
+            .Where(MatchesStatus)
+            .Where(MatchesBranch);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranchesAsync();
+        await LoadVehiclesAsync();
+    }
+
+    private async Task LoadBranchesAsync()
+    {
+        Branches = await BranchService.GetAllAsync();
+    }
+
+    private async Task LoadVehiclesAsync()
+    {
+        IsLoading = true;
+
+        try
+        {
+            var includeInactive = StatusFilter != "Active";
+
+            VehicleList = await VehicleService.GetAllAsync(
+                includeInactive);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private bool MatchesSearch(Vehicle vehicle)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            return true;
+        }
+
+        var search = SearchText.Trim();
+
+        return vehicle.Name.Contains(
+                   search,
+                   StringComparison.OrdinalIgnoreCase)
+               || vehicle.RegistrationNumber.Contains(
+                   search,
+                   StringComparison.OrdinalIgnoreCase)
+               || (vehicle.InventoryNumber?.Contains(
+                       search,
+                       StringComparison.OrdinalIgnoreCase)
+                   ?? false);
+    }
+
+    private bool MatchesStatus(Vehicle vehicle)
+    {
+        return StatusFilter switch
+        {
+            "Active" => vehicle.IsActive,
+            "Inactive" => !vehicle.IsActive,
+            _ => true
+        };
+    }
+
+    private async Task OnStatusChanged(ChangeEventArgs e)
+    {
+        StatusFilter = e.Value?.ToString() ?? "Active";
+
+        await LoadVehiclesAsync();
+    }
+
+    private bool MatchesBranch(Vehicle vehicle)
+    {
+        if (SelectedBranchId is null)
+        {
+            return true;
+        }
+
+        return vehicle.BranchId == SelectedBranchId.Value;
+    }
+    private void OpenDeleteDialog(Vehicle vehicle)
+    {
+        VehicleToDelete = vehicle;
+        ErrorMessage = null;
+        ShowDeleteDialog = true;
+    }
+
+    private void CloseDeleteDialog()
+    {
+        if (IsDeleting)
+        {
+            return;
+        }
+
+        ShowDeleteDialog = false;
+        VehicleToDelete = null;
+        ErrorMessage = null;
+    }
+
+    private async Task ConfirmDeleteVehicle()
+    {
+        if (VehicleToDelete is null)
+        {
+            return;
+        }
+
+        IsDeleting = true;
+        ErrorMessage = null;
+
+        try
+        {
+            await VehicleService.DeleteAsync(
+                VehicleToDelete.Id);
+
+            ShowDeleteDialog = false;
+            VehicleToDelete = null;
+
+            await LoadVehiclesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsDeleting = false;
+        }
+    }
+    private void OpenCreateDialog()
+    {
+        EditingVehicle = null;
+        ErrorMessage = null;
+
+        EditModel = new VehicleEditModel();
+
+        ShowDialog = true;
+    }
+
+    private void OpenEditDialog(Vehicle vehicle)
+    {
+        EditingVehicle = vehicle;
+        ErrorMessage = null;
+
+        EditModel = new VehicleEditModel
+        {
+            Name = vehicle.Name,
+            RegistrationNumber = vehicle.RegistrationNumber,
+            InventoryNumber = vehicle.InventoryNumber,
+            BranchId = vehicle.BranchId
+        };
+
+        ShowDialog = true;
+    }
+
+    private void CloseDialog()
+    {
+        ShowDialog = false;
+        EditingVehicle = null;
+        ErrorMessage = null;
+    }
+
+    private async Task SaveVehicle()
+    {
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            if (EditingVehicle is null)
+            {
+                await VehicleService.CreateAsync(
+                    EditModel.Name,
+                    EditModel.RegistrationNumber,
+                    EditModel.BranchId,
+                    EditModel.InventoryNumber);
+            }
+            else
+            {
+                await VehicleService.UpdateAsync(
+                    EditingVehicle.Id,
+                    EditModel.Name,
+                    EditModel.RegistrationNumber,
+                    EditModel.BranchId,
+                    EditModel.InventoryNumber);
+            }
+
+            CloseDialog();
+
+            await LoadVehiclesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task Deactivate(Vehicle vehicle)
+    {
+        try
+        {
+            await VehicleService.SetActiveAsync(
+                vehicle.Id,
+                false);
+
+            await LoadVehiclesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task Activate(Vehicle vehicle)
+    {
+        try
+        {
+            await VehicleService.SetActiveAsync(
+                vehicle.Id,
+                true);
+
+            await LoadVehiclesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private sealed class VehicleEditModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(
+            ErrorMessage = "Введите название техники.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(
+            ErrorMessage = "Введите госномер.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string RegistrationNumber { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string? InventoryNumber { get; set; }
+
+        public Guid? BranchId { get; set; }
+    }
+}

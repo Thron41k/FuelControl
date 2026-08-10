@@ -2,34 +2,22 @@
 
 namespace FuelControl.Infrastructure.Services.Interfaces;
 
-public interface IVehicleService
+public interface IBranchService
 {
-    Task<IReadOnlyList<Vehicle>> GetAllAsync(
-        bool includeInactive = false,
+    Task<IReadOnlyList<Branch>> GetAllAsync(
         CancellationToken cancellationToken = default);
 
-    Task<Vehicle?> GetByIdAsync(
+    Task<Branch?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default);
 
     Task<Guid> CreateAsync(
         string name,
-        string registrationNumber,
-        Guid? branchId,
-        string? inventoryNumber,
         CancellationToken cancellationToken = default);
 
     Task UpdateAsync(
         Guid id,
         string name,
-        string registrationNumber,
-        Guid? branchId,
-        string? inventoryNumber,
-        CancellationToken cancellationToken = default);
-
-    Task SetActiveAsync(
-        Guid id,
-        bool isActive,
         CancellationToken cancellationToken = default);
 
     Task DeleteAsync(

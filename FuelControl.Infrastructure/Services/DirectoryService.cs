@@ -27,26 +27,6 @@ public sealed class DirectoryService(FuelControlDbContext db)
         await db.SaveChangesAsync();
     }
 
-    // —— Техника ——
-    public Task<List<Vehicle>> GetVehiclesAsync(bool onlyActive = true) =>
-        db.Vehicles
-            .Where(x => !onlyActive || x.IsActive)
-            .OrderBy(x => x.Name)
-            .ToListAsync();
-
-    public async Task CreateVehicleAsync(string name, string regNumber, Guid branchId, string? inventory)
-    {
-        db.Vehicles.Add(new Vehicle(name, regNumber, branchId, inventory));
-        await db.SaveChangesAsync();
-    }
-
-    public async Task UpdateVehicleAsync(Guid id, string name, string regNumber, Guid branchId, string? inventory)
-    {
-        var entity = await db.Vehicles.FindAsync(id)
-            ?? throw new InvalidOperationException("Техника не найдена");
-        entity.Update(name, regNumber, branchId, inventory);
-        await db.SaveChangesAsync();
-    }
 
     // —— Машинисты ——
     public Task<List<Operator>> GetOperatorsAsync(bool onlyActive = true) =>
