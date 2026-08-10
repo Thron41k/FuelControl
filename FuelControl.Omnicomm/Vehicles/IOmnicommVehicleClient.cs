@@ -8,4 +8,10 @@ public interface IOmnicommVehicleClient
         long parentGroupId,
         long actorId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OmnicommObject>> GetWantedObjectsAsync(
+        IReadOnlyCollection<long> groupIds,
+        IReadOnlyCollection<long> objectIds,
+        long actorId,
+        CancellationToken cancellationToken = default);
 }

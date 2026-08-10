@@ -102,6 +102,32 @@ public sealed class OmnicommApiClient(
             cancellationToken);
     }
 
+    public async Task<TResponse?> PostFormAsync<TResponse>(
+        string requestUri,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(
+            () =>
+            {
+                var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    requestUri);
+
+                request.Content =
+                    new FormUrlEncodedContent(parameters);
+
+                return request;
+            },
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<TResponse>(
+            JsonOptions,
+            cancellationToken);
+    }
+
     private async Task EnsureAuthenticatedAsync(
         CancellationToken cancellationToken)
     {

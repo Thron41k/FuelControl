@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Net.Http;
+using System.Text.Json;
 using FuelControl.Omnicomm.Http;
 using FuelControl.Omnicomm.Vehicles.Models;
 using FuelControl.Omnicomm.Vehicles.Serialization;
@@ -49,5 +50,49 @@ public sealed class OmnicommVehicleClient(
         }
 
         return result;
+    }
+
+    public async Task<IReadOnlyList<OmnicommObject>> GetWantedObjectsAsync(
+        IReadOnlyCollection<long> groupIds,
+        IReadOnlyCollection<long> objectIds,
+        long actorId,
+        CancellationToken cancellationToken = default)
+    {
+        var wanted = new
+        {
+            groups = groupIds,
+            objects = objectIds
+        };
+
+        var alreadyHave = new
+        {
+            groups = (IReadOnlyCollection<long>)Array.Empty<long>(),
+            objects = (IReadOnlyCollection<long>)Array.Empty<long>()
+        };
+
+        var parameters =
+            new Dictionary<string, string>
+            {
+                ["action"] = "getWantedList",
+
+                ["wanted"] =
+                    JsonSerializer.Serialize(wanted),
+
+                ["alreadyHave"] =
+                    JsonSerializer.Serialize(alreadyHave),
+
+                ["allInclusive"] = "true",
+
+                ["actorID"] =
+                    actorId.ToString()
+            };
+
+        var response =
+            await apiClient.PostFormAsync<OmnicommWantedListResponse>(
+                "/vehiclesTree",
+                parameters,
+                cancellationToken);
+
+        return response?.Objects ?? [];
     }
 }

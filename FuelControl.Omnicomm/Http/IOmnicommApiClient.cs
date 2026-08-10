@@ -16,4 +16,9 @@ public interface IOmnicommApiClient : IDisposable
         string requestUri,
         TRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<TResponse?> PostFormAsync<TResponse>(
+        string requestUri,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken = default);
 }
