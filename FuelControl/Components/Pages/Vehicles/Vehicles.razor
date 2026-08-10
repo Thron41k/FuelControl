@@ -4,12 +4,14 @@
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
 @using Microsoft.AspNetCore.Authorization
+@using FuelControl.Omnicomm.Vehicles.Models
 
 @attribute [Authorize(Roles = $"{Roles.Admin},{Roles.Dispatcher}")]
 
 @inject IVehicleService VehicleService
 @inject IBranchService BranchService
 @inject NavigationManager Navigation
+@inject IOmnicommVehicleImportService OmnicommVehicleImportService
 
 <PageTitle>Техника</PageTitle>
 
@@ -119,6 +121,10 @@
                         <th>
                             Госномер
                         </th>
+                        
+                        <th>
+                            Omnicomm ID
+                        </th>
 
                         <th>
                             Статус
@@ -180,7 +186,9 @@
                                     @vehicle.RegistrationNumber
                                 </td>
 
-                                
+                                <td>
+                                    @vehicle.OmnicommObjectId
+                                </td>
 
                                 <td>
 
@@ -298,7 +306,170 @@
                                 @ErrorMessage
                             </div>
                         }
+                        @if (ShowOmnicommImport)
+                        {
+                            <div class="card border-primary mb-4">
 
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+
+                                    <span>
+                                        <span class="bi bi-cloud-download me-1"></span>
+                                        Импорт техники из Omnicomm
+                                    </span>
+
+                                    <button type="button"
+                                            class="btn btn-sm btn-light"
+                                            @onclick="CloseOmnicommImport">
+
+                                        Закрыть
+
+                                    </button>
+
+                                </div>
+
+                                <div class="card-body">
+
+                                    @if (IsImporting)
+                                    {
+                                        <div class="text-center py-4">
+
+                                            <div class="spinner-border"
+                                                 role="status">
+
+                                                <span class="visually-hidden">
+                                                    Загрузка...
+                                                </span>
+
+                                            </div>
+
+                                            <div class="mt-2 text-muted">
+                                                Получение техники из Omnicomm...
+                                            </div>
+
+                                        </div>
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(OmnicommImportError))
+                                    {
+                                        <div class="alert alert-danger mb-0">
+
+                                            <span class="bi bi-exclamation-triangle me-1"></span>
+
+                                            @OmnicommImportError
+
+                                        </div>
+                                    }
+                                    else if (OmnicommGroups.Count == 0)
+                                    {
+                                        <div class="alert alert-warning mb-0">
+
+                                            Техника из Omnicomm не найдена.
+
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="row g-3">
+
+                                            <div class="col-12 col-lg-4">
+
+                                                <label class="form-label fw-semibold">
+                                                    Группа
+                                                </label>
+
+                                                <div class="list-group"
+                                                     style="max-height: 300px; overflow-y: auto;">
+
+                                                    @foreach (var group in OmnicommGroups)
+                                                    {
+                                                        var isSelected =
+                                                            SelectedOmnicommGroupId == group.Id;
+
+                                                        <button type="button"
+                                                                class="list-group-item list-group-item-action @(isSelected ? "active" : "")"
+                                                                @onclick="() => SelectOmnicommGroup(group.Id)">
+
+                                                            <div class="d-flex justify-content-between align-items-center">
+
+                                                                <span>
+                                                                    @group.Name
+                                                                </span>
+
+                                                                <span class="badge @(isSelected ? "text-bg-light" : "text-bg-secondary")">
+                                                                    @GetGroupObjectCount(group.Id)
+                                                                </span>
+
+                                                            </div>
+
+                                                        </button>
+                                                    }
+
+                                                </div>
+
+                                            </div>
+
+                                            <div class="col-12 col-lg-8">
+
+                                                <label class="form-label fw-semibold">
+                                                    Техника
+                                                </label>
+
+                                                @if (SelectedOmnicommGroupId is null)
+                                                {
+                                                    <div class="alert alert-light border">
+                                                        Выберите группу.
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    var groupObjects =
+                                                        GetObjectsForGroup(
+                                                            SelectedOmnicommGroupId.Value);
+
+                                                    @if (!groupObjects.Any())
+                                                    {
+                                                        <div class="alert alert-warning">
+                                                            В выбранной группе нет техники.
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="list-group"
+                                                             style="max-height: 300px; overflow-y: auto;">
+
+                                                            @foreach (var vehicleObject in groupObjects)
+                                                            {
+                                                                <button type="button"
+                                                                        class="list-group-item list-group-item-action" disabled=@vehicleObject.IsAlreadyAdded
+                                                                        @onclick="() => SelectOmnicommObject(vehicleObject)">
+
+                                                                    <div class="d-flex justify-content-between">
+
+                                                                        <span>
+                                                                            @vehicleObject.Name
+                                                                        </span>
+
+                                                                        <small class="text-muted">
+                                                                            @vehicleObject.Id
+                                                                        </small>
+
+                                                                    </div>
+
+                                                                </button>
+                                                            }
+
+                                                        </div>
+                                                    }
+                                                }
+
+                                            </div>
+
+                                        </div>
+                                    }
+
+                                </div>
+
+                            </div>
+                        }
                         <div class="mb-3">
 
                             <label class="form-label">
@@ -324,9 +495,23 @@
                             <ValidationMessage For="() => EditModel.RegistrationNumber" />
 
                         </div>
+                        
+                        
 
                         <AuthorizeView Roles="@Roles.Admin">
                             <ChildContent Context="adminContext">
+                                
+                                <div class="mb-3">
+
+                                    <label class="form-label">
+                                        Omnicomm ID
+                                    </label>
+
+                                    <InputNumber class="form-control"
+                                               @bind-Value="EditModel.OmnicommObjectId" />
+
+
+                                </div>
 
                                 <div class="mb-3">
 
@@ -361,7 +546,26 @@
                     </div>
 
                     <div class="modal-footer">
+                        @if (EditingVehicle is null)
+                        {
+                            <button type="button"
+                                    class="btn btn-outline-primary me-auto"
+                                    @onclick="ImportFromOmnicomm"
+                                    disabled="@IsImporting">
 
+                                @if (IsImporting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"
+                                          role="status">
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="bi bi-cloud-download me-1">Импортировать из Omnicomm</span>
+                                }
+
+                            </button>
+                        }
                         <button type="button"
                                 class="btn btn-secondary"
                                 @onclick="CloseDialog">
@@ -501,6 +705,19 @@
     </div>
 }
 @code {
+    private bool ShowOmnicommImport;
+
+    private bool IsImporting;
+
+    private string? OmnicommImportError;
+
+    private OmnicommWantedListResponse? OmnicommImportResult;
+
+    private IReadOnlyList<OmnicommGroup> OmnicommGroups = [];
+
+    private IReadOnlyList<OmnicommObject> OmnicommObjects = [];
+
+    private long? SelectedOmnicommGroupId;
     private bool ShowDeleteDialog;
 
     private Vehicle? VehicleToDelete;
@@ -536,6 +753,129 @@
     {
         await LoadBranchesAsync();
         await LoadVehiclesAsync();
+    }
+
+    private async Task ImportFromOmnicomm()
+    {
+        if (EditingVehicle is not null)
+        {
+            return;
+        }
+
+        IsImporting = true;
+        OmnicommImportError = null;
+
+        ShowOmnicommImport = true;
+
+        try
+        {
+            OmnicommImportResult =
+                await OmnicommVehicleImportService.ImportAsync();
+
+            OmnicommGroups =
+                OmnicommImportResult.Groups
+                    .OrderBy(x => x.Name)
+                    .ToArray();
+
+            OmnicommObjects =
+                OmnicommImportResult.Objects
+                    .OrderBy(x => x.Name)
+                    .ToArray();
+
+            SelectedOmnicommGroupId = null;
+        }
+        catch (Exception ex)
+        {
+            OmnicommImportError =
+                $"Не удалось получить технику из Omnicomm: {ex.Message}";
+
+            OmnicommImportResult = null;
+
+            OmnicommGroups = [];
+
+            OmnicommObjects = [];
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
+
+    private void CloseOmnicommImport()
+    {
+        ShowOmnicommImport = false;
+
+        OmnicommImportError = null;
+
+        SelectedOmnicommGroupId = null;
+    }
+
+    private IEnumerable<OmnicommObject> GetObjectsForGroup(
+        long groupId)
+    {
+        var group =
+            OmnicommGroups.FirstOrDefault(
+                x => x.Id == groupId);
+
+        if (group is null)
+        {
+            return [];
+        }
+
+        var objectIds =
+            group.ObjectIds.ToHashSet();
+
+        return OmnicommObjects
+            .Where(x => objectIds.Contains(x.Id))
+            .OrderBy(x => x.Name);
+    }
+
+    private int GetGroupObjectCount(long groupId)
+    {
+        var group =
+            OmnicommGroups.FirstOrDefault(
+                x => x.Id == groupId);
+
+        if (group is null)
+        {
+            return 0;
+        }
+
+        return group.ObjectIds.Count;
+    }
+
+    private void SelectOmnicommObject(
+        OmnicommObject vehicleObject)
+    {
+        EditModel.Name = vehicleObject.Name;
+
+        EditModel.RegistrationNumber = string.Empty;
+        EditModel.OmnicommObjectId = vehicleObject.Id;
+
+        var group =
+            OmnicommGroups.FirstOrDefault(
+                x => x.Id == SelectedOmnicommGroupId);
+
+        if (group is not null)
+        {
+            var branch =
+                Branches.FirstOrDefault(
+                    x => x.OmnicommId == group.Id);
+
+            if (branch is not null)
+            {
+                EditModel.BranchId = branch.Id;
+            }
+        }
+
+        ShowOmnicommImport = false;
+
+        SelectedOmnicommGroupId = null;
+    }
+
+    private void SelectOmnicommGroup(long groupId)
+    {
+        SelectedOmnicommGroupId = groupId;
     }
 
     private async Task LoadBranchesAsync()
@@ -662,7 +1002,22 @@
     private void OpenCreateDialog()
     {
         EditingVehicle = null;
+
         ErrorMessage = null;
+
+        OmnicommImportError = null;
+
+        ShowOmnicommImport = false;
+
+        IsImporting = false;
+
+        OmnicommImportResult = null;
+
+        OmnicommGroups = [];
+
+        OmnicommObjects = [];
+
+        SelectedOmnicommGroupId = null;
 
         EditModel = new VehicleEditModel();
 
@@ -672,14 +1027,28 @@
     private void OpenEditDialog(Vehicle vehicle)
     {
         EditingVehicle = vehicle;
+
         ErrorMessage = null;
+
+        ShowOmnicommImport = false;
+
+        OmnicommImportError = null;
+
+        OmnicommImportResult = null;
+
+        OmnicommGroups = [];
+
+        OmnicommObjects = [];
+
+        SelectedOmnicommGroupId = null;
 
         EditModel = new VehicleEditModel
         {
             Name = vehicle.Name,
             RegistrationNumber = vehicle.RegistrationNumber,
             InventoryNumber = vehicle.InventoryNumber,
-            BranchId = vehicle.BranchId
+            BranchId = vehicle.BranchId,
+            OmnicommObjectId = vehicle.OmnicommObjectId
         };
 
         ShowDialog = true;
@@ -688,8 +1057,22 @@
     private void CloseDialog()
     {
         ShowDialog = false;
+
         EditingVehicle = null;
+
         ErrorMessage = null;
+
+        ShowOmnicommImport = false;
+
+        OmnicommImportError = null;
+
+        OmnicommImportResult = null;
+
+        OmnicommGroups = [];
+
+        OmnicommObjects = [];
+
+        SelectedOmnicommGroupId = null;
     }
 
     private async Task SaveVehicle()
@@ -705,7 +1088,8 @@
                     EditModel.Name,
                     EditModel.RegistrationNumber,
                     EditModel.BranchId,
-                    EditModel.InventoryNumber);
+                    EditModel.InventoryNumber,
+                    EditModel.OmnicommObjectId);
             }
             else
             {
@@ -714,7 +1098,8 @@
                     EditModel.Name,
                     EditModel.RegistrationNumber,
                     EditModel.BranchId,
-                    EditModel.InventoryNumber);
+                    EditModel.InventoryNumber,
+                    EditModel.OmnicommObjectId);
             }
 
             CloseDialog();
@@ -783,5 +1168,6 @@
         public string? InventoryNumber { get; set; }
 
         public Guid? BranchId { get; set; }
+        public long? OmnicommObjectId { get; set; } = null;
     }
 }

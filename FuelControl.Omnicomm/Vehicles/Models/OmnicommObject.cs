@@ -13,4 +13,6 @@ public sealed class OmnicommObject
     public int Value { get; init; }
 
     public bool Flag { get; init; }
+
+    public bool IsAlreadyAdded { get; set; }
 }

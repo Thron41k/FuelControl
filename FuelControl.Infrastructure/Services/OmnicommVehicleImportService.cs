@@ -8,6 +8,7 @@ namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommVehicleImportService(
     IOmnicommVehicleClient vehicleClient,
+    IVehicleService vehicleService,
     IOptions<OmnicommOptions> options)
     : IOmnicommVehicleImportService
 {
@@ -36,12 +37,19 @@ public sealed class OmnicommVehicleImportService(
             objectIds.Add(vehicleObject.Id);
         }
 
+        var existingIds = (await vehicleService.GetExistingOmnicommVehicleIdsAsync(cancellationToken)).ToHashSet();
+
         var objects =
             await vehicleClient.GetWantedObjectsAsync(
                 groups.Keys,
                 objectIds,
                 _options.ActorId,
                 cancellationToken);
+
+        foreach (var omnicommObject in objects)
+        {
+            omnicommObject.IsAlreadyAdded = existingIds.Contains(omnicommObject.Id);
+        }
 
         return new OmnicommWantedListResponse
         {

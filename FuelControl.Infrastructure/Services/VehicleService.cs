@@ -124,11 +124,11 @@ public sealed class VehicleService(
             .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<Guid> CreateAsync(
-        string name,
+    public async Task<Guid> CreateAsync(string name,
         string registrationNumber,
         Guid? branchId,
         string? inventoryNumber,
+        long? omnicommObjectId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -141,6 +141,7 @@ public sealed class VehicleService(
             name.Trim(),
             registrationNumber.Trim(),
             targetBranchId,
+            omnicommObjectId,
             NormalizeInventoryNumber(inventoryNumber));
 
         dbContext.Vehicles.Add(vehicle);
@@ -156,6 +157,7 @@ public sealed class VehicleService(
         string registrationNumber,
         Guid? branchId,
         string? inventoryNumber,
+        long? omnicommObjectId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -183,6 +185,7 @@ public sealed class VehicleService(
                 name.Trim(),
                 registrationNumber.Trim(),
                 branchId.Value,
+                omnicommObjectId,
                 NormalizeInventoryNumber(inventoryNumber));
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -215,6 +218,7 @@ public sealed class VehicleService(
             name.Trim(),
             registrationNumber.Trim(),
             user.BranchId.Value,
+            omnicommObjectId,
             NormalizeInventoryNumber(inventoryNumber));
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -313,6 +317,16 @@ public sealed class VehicleService(
         // Никогда не используем requestedBranchId
         // для Dispatcher.
         return user.BranchId.Value;
+    }
+
+    public async Task<IReadOnlyCollection<long>>
+        GetExistingOmnicommVehicleIdsAsync(
+            CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Vehicles
+            .Where(x => x.OmnicommObjectId != null)
+            .Select(x => x.OmnicommObjectId!.Value)
+            .ToListAsync(cancellationToken);
     }
 
     private static void SetVehicleState(

@@ -12,11 +12,11 @@ public interface IVehicleService
         Guid id,
         CancellationToken cancellationToken = default);
 
-    Task<Guid> CreateAsync(
-        string name,
+    Task<Guid> CreateAsync(string name,
         string registrationNumber,
         Guid? branchId,
         string? inventoryNumber,
+        long? omnicommObjectId,
         CancellationToken cancellationToken = default);
 
     Task UpdateAsync(
@@ -25,6 +25,7 @@ public interface IVehicleService
         string registrationNumber,
         Guid? branchId,
         string? inventoryNumber,
+        long? omnicommObjectId,
         CancellationToken cancellationToken = default);
 
     Task SetActiveAsync(
@@ -34,5 +35,8 @@ public interface IVehicleService
 
     Task DeleteAsync(
         Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<long>> GetExistingOmnicommVehicleIdsAsync(
         CancellationToken cancellationToken = default);
 }

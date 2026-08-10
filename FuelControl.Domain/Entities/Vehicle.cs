@@ -24,10 +24,11 @@ public sealed class Vehicle
         string name,
         string registrationNumber,
         Guid branch,
+        long? omnicommObjectId,
         string? inventoryNumber = null)
     {
         Id = Guid.NewGuid();
-
+        OmnicommObjectId = omnicommObjectId;
         Name = name;
         RegistrationNumber = registrationNumber;
         InventoryNumber = inventoryNumber;
@@ -39,9 +40,11 @@ public sealed class Vehicle
         string name,
         string registrationNumber,
         Guid branch,
+        long? omnicommObjectId,
         string? inventoryNumber)
     {
         Name = name;
+        OmnicommObjectId = omnicommObjectId;
         RegistrationNumber = registrationNumber;
         InventoryNumber = inventoryNumber;
         BranchId = branch;
