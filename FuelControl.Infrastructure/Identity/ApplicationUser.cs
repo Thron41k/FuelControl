@@ -11,4 +11,6 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
     /// <summary>IANA timezone, например Asia/Chita. Если пусто — берём из браузера.</summary>
     public string? TimeZoneId { get; set; }
+
+    public Guid? BranchId { get; set; }
 }

@@ -3,6 +3,7 @@
 public sealed class FuelTruck
 {
     public Guid Id { get; private set; }
+    public Guid BranchId { get; private set; }
 
     public string Name { get; private set; } = null!;
 
@@ -21,6 +22,7 @@ public sealed class FuelTruck
     public FuelTruck(
         string name,
         string registrationNumber,
+        Guid branch,
         string? inventoryNumber = null)
     {
         Id = Guid.NewGuid();
@@ -28,18 +30,20 @@ public sealed class FuelTruck
         Name = name;
         RegistrationNumber = registrationNumber;
         InventoryNumber = inventoryNumber;
-
+        BranchId = branch;
         IsActive = true;
     }
 
     public void Update(
         string name,
         string registrationNumber,
+        Guid branch,
         string? inventoryNumber)
     {
         Name = name;
         RegistrationNumber = registrationNumber;
         InventoryNumber = inventoryNumber;
+        BranchId = branch;
     }
 
     public void SetOmnicommObjectId(long objectId)

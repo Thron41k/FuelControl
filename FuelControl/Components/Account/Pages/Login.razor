@@ -2,7 +2,7 @@
 @layout AuthLayout
 @using System.ComponentModel.DataAnnotations
 @using FuelControl.Components.Layout
-@using FuelControl.Data
+@using FuelControl.Infrastructure.Identity
 @using Microsoft.AspNetCore.Identity
 
 @inject SignInManager<ApplicationUser> SignInManager
@@ -13,8 +13,6 @@
 <PageTitle>Вход — FuelControl</PageTitle>
 
 <div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center bg-light">
-
-    ```
     <div class="row w-100 justify-content-center">
 
         <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">

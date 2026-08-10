@@ -3,6 +3,7 @@
 public sealed class Operator
 {
     public Guid Id { get; private set; }
+    public Guid BranchId { get; private set; }
 
     public string FullName { get; private set; } = null!;
 
@@ -16,22 +17,25 @@ public sealed class Operator
 
     public Operator(
         string fullName,
+        Guid branch,
         string? personnelNumber = null)
     {
         Id = Guid.NewGuid();
 
         FullName = fullName;
         PersonnelNumber = personnelNumber;
-
+        BranchId = branch;
         IsActive = true;
     }
 
     public void Update(
         string fullName,
+        Guid branch,
         string? personnelNumber)
     {
         FullName = fullName;
         PersonnelNumber = personnelNumber;
+        BranchId = branch;
     }
 
     public void Activate()

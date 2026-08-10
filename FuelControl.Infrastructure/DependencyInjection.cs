@@ -1,6 +1,8 @@
-﻿using FuelControl.Infrastructure.Identity;
+﻿using FuelControl.Infrastructure.Authorization;
+using FuelControl.Infrastructure.Identity;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services;
+using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Omnicomm.Authentication;
 using FuelControl.Omnicomm.Configuration;
 using FuelControl.Omnicomm.Http;
@@ -79,6 +81,11 @@ public static class DependencyInjection
 
         services.AddScoped<IOmnicommVehicleClient, OmnicommVehicleClient>();
         services.AddScoped<IOmnicommReportClient, OmnicommReportClient>();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        services.AddScoped<
+            IFuelingRecordAuthorizationService,
+            FuelingRecordAuthorizationService>();
         services.AddScoped<DirectoryService>();
         services.AddScoped<FuelingRecordService>();
         return services;
