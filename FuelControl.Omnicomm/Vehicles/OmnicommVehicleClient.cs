@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using FuelControl.Omnicomm.Http;
-using FuelControl.Omnicomm.Models;
 using FuelControl.Omnicomm.Vehicles.Models;
 using FuelControl.Omnicomm.Vehicles.Serialization;
 
@@ -11,7 +10,7 @@ public sealed class OmnicommVehicleClient(
     : IOmnicommVehicleClient
 {
     private static readonly JsonSerializerOptions JsonOptions =
-        CreateJsonOptions();
+        OmnicommJsonOptions.Create();
 
     public async Task<OmnicommVehiclesTreeResponse>
         GetVehiclesTreeAsync(
@@ -50,18 +49,5 @@ public sealed class OmnicommVehicleClient(
         }
 
         return result;
-    }
-
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
-        options.Converters.Add(
-            new OmnicommVehicleGroupConverter());
-
-        return options;
     }
 }

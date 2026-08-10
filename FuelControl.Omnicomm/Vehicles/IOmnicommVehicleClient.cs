@@ -1,4 +1,3 @@
-using FuelControl.Omnicomm.Models;
 using FuelControl.Omnicomm.Vehicles.Models;
 
 namespace FuelControl.Omnicomm.Vehicles;

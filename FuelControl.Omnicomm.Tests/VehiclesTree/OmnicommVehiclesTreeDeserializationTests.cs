@@ -1,6 +1,6 @@
-﻿using FuelControl.Omnicomm.Models;
-using FuelControl.Omnicomm.Vehicles.Serialization;
+﻿using FuelControl.Omnicomm.Vehicles.Serialization;
 using System.Text.Json;
+using FuelControl.Omnicomm.Vehicles.Models;
 
 namespace FuelControl.Omnicomm.Tests.VehiclesTree;
 

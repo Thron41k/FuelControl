@@ -19,20 +19,7 @@ public sealed class OmnicommApiClient(
     private OmnicommTokens? _tokens;
 
     private static readonly JsonSerializerOptions JsonOptions =
-        CreateJsonOptions();
-
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
-        options.Converters.Add(
-            new OmnicommVehicleGroupConverter());
-
-        return options;
-    }
+        OmnicommJsonOptions.Create();
 
     public async Task<HttpResponseMessage> SendAsync(
         Func<HttpRequestMessage> requestFactory,

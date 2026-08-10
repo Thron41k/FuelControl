@@ -4,18 +4,20 @@ using FuelControl.Omnicomm.Vehicles.Models;
 
 namespace FuelControl.Omnicomm.Vehicles.Serialization;
 
-public sealed class OmnicommGroupConverter
-    : JsonConverter<OmnicommGroup>
+public sealed class OmnicommGroupConverter : JsonConverter<OmnicommGroup>
 {
     public override OmnicommGroup Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
         JsonSerializerOptions options)
     {
+        Console.WriteLine(
+            ">>> OmnicommGroupConverter CALLED");
         if (reader.TokenType != JsonTokenType.StartArray)
         {
             throw new JsonException(
-                "Ожидался массив OmnicommGroup.");
+                $"Ожидался массив группы Omnicomm, " +
+                $"получен {reader.TokenType}.");
         }
 
         using var document =
@@ -24,31 +26,49 @@ public sealed class OmnicommGroupConverter
         var array = document.RootElement;
 
         if (array.ValueKind != JsonValueKind.Array ||
-            array.GetArrayLength() != 4)
+            array.GetArrayLength() < 4)
         {
             throw new JsonException(
-                "OmnicommGroup должен содержать 4 элемента.");
+                "Некорректный формат группы Omnicomm.");
         }
 
-        var details = array[3];
+        var id = array[0].GetInt64();
+
+        var name =
+            array[1].GetString() ?? string.Empty;
+
+        var type =
+            array[2].GetString() ?? string.Empty;
+
+        var data = array[3];
+
+        var objectIds =
+            data.TryGetProperty(
+                "objects",
+                out var objects)
+                ? objects
+                    .EnumerateArray()
+                    .Select(x => x.GetInt64())
+                    .ToArray()
+                : [];
+
+        var childGroupIds =
+            data.TryGetProperty(
+                "groups",
+                out var groups)
+                ? groups
+                    .EnumerateArray()
+                    .Select(x => x.GetInt64())
+                    .ToArray()
+                : [];
 
         return new OmnicommGroup
         {
-            Id = array[0].GetInt64(),
-
-            Name = array[1].GetString()
-                ?? string.Empty,
-
-            Type = array[2].GetString()
-                ?? string.Empty,
-
-            ObjectIds = ReadIds(
-                details,
-                "objects"),
-
-            ChildGroupIds = ReadIds(
-                details,
-                "groups")
+            Id = id,
+            Name = name,
+            Type = type,
+            ObjectIds = objectIds,
+            ChildGroupIds = childGroupIds
         };
     }
 
@@ -57,61 +77,6 @@ public sealed class OmnicommGroupConverter
         OmnicommGroup value,
         JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-
-        writer.WriteNumberValue(value.Id);
-        writer.WriteStringValue(value.Name);
-        writer.WriteStringValue(value.Type);
-
-        writer.WriteStartObject();
-
-        writer.WritePropertyName("objects");
-
-        writer.WriteStartArray();
-
-        foreach (var objectId in value.ObjectIds)
-        {
-            writer.WriteNumberValue(objectId);
-        }
-
-        writer.WriteEndArray();
-
-        writer.WritePropertyName("groups");
-
-        writer.WriteStartArray();
-
-        foreach (var groupId in value.ChildGroupIds)
-        {
-            writer.WriteNumberValue(groupId);
-        }
-
-        writer.WriteEndArray();
-
-        writer.WriteEndObject();
-
-        writer.WriteEndArray();
-    }
-
-    private static IReadOnlyList<long> ReadIds(
-        JsonElement element,
-        string propertyName)
-    {
-        if (!element.TryGetProperty(
-                propertyName,
-                out var property))
-        {
-            return [];
-        }
-
-        if (property.ValueKind != JsonValueKind.Array)
-        {
-            throw new JsonException(
-                $"Поле '{propertyName}' должно быть массивом.");
-        }
-
-        return property
-            .EnumerateArray()
-            .Select(x => x.GetInt64())
-            .ToArray();
+        throw new NotSupportedException();
     }
 }
