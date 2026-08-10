@@ -2,7 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FuelControl.Components.Account.Pages;
 using FuelControl.Components.Account.Pages.Manage;
-using FuelControl.Data;
+using FuelControl.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;

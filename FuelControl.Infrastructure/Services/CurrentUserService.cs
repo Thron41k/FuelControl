@@ -14,6 +14,15 @@ public sealed class CurrentUserService(
     public bool IsAuthenticated =>
         User?.Identity?.IsAuthenticated == true;
 
-    public string? UserId =>
-        User?.FindFirstValue(ClaimTypes.NameIdentifier);
+    public Guid? UserId
+    {
+        get
+        {
+            var value = User?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            return Guid.TryParse(value, out var userId)
+                ? userId
+                : null;
+        }
+    }
 }

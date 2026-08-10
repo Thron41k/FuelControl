@@ -30,5 +30,11 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
             .IsUnique();
 
         builder.HasIndex(x => x.OmnicommObjectId);
+        builder.HasOne(x => x.Branch)
+            .WithMany()
+            .HasForeignKey(x => x.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.BranchId);
     }
 }

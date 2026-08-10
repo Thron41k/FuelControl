@@ -13,17 +13,17 @@ public sealed class DirectoryService(FuelControlDbContext db)
             .OrderBy(x => x.Name)
             .ToListAsync();
 
-    public async Task CreateFuelTruckAsync(string name, string regNumber, string? inventory)
+    public async Task CreateFuelTruckAsync(string name, string regNumber, Guid branchId, string? inventory)
     {
-        db.FuelTrucks.Add(new FuelTruck(name, regNumber, inventory));
+        db.FuelTrucks.Add(new FuelTruck(name, regNumber, branchId, inventory));
         await db.SaveChangesAsync();
     }
 
-    public async Task UpdateFuelTruckAsync(Guid id, string name, string regNumber, string? inventory)
+    public async Task UpdateFuelTruckAsync(Guid id, string name, string regNumber, Guid branchId, string? inventory)
     {
         var entity = await db.FuelTrucks.FindAsync(id)
             ?? throw new InvalidOperationException("АТЗ не найден");
-        entity.Update(name, regNumber, inventory);
+        entity.Update(name, regNumber, branchId, inventory);
         await db.SaveChangesAsync();
     }
 
@@ -34,17 +34,17 @@ public sealed class DirectoryService(FuelControlDbContext db)
             .OrderBy(x => x.Name)
             .ToListAsync();
 
-    public async Task CreateVehicleAsync(string name, string regNumber, string? inventory)
+    public async Task CreateVehicleAsync(string name, string regNumber, Guid branchId, string? inventory)
     {
-        db.Vehicles.Add(new Vehicle(name, regNumber, inventory));
+        db.Vehicles.Add(new Vehicle(name, regNumber, branchId, inventory));
         await db.SaveChangesAsync();
     }
 
-    public async Task UpdateVehicleAsync(Guid id, string name, string regNumber, string? inventory)
+    public async Task UpdateVehicleAsync(Guid id, string name, string regNumber, Guid branchId, string? inventory)
     {
         var entity = await db.Vehicles.FindAsync(id)
             ?? throw new InvalidOperationException("Техника не найдена");
-        entity.Update(name, regNumber, inventory);
+        entity.Update(name, regNumber, branchId, inventory);
         await db.SaveChangesAsync();
     }
 
@@ -55,17 +55,17 @@ public sealed class DirectoryService(FuelControlDbContext db)
             .OrderBy(x => x.FullName)
             .ToListAsync();
 
-    public async Task CreateOperatorAsync(string fullName, string? personnelNumber)
+    public async Task CreateOperatorAsync(string fullName, Guid branchId, string? personnelNumber)
     {
-        db.Operators.Add(new Operator(fullName, personnelNumber));
+        db.Operators.Add(new Operator(fullName, branchId, personnelNumber));
         await db.SaveChangesAsync();
     }
 
-    public async Task UpdateOperatorAsync(Guid id, string fullName, string? personnelNumber)
+    public async Task UpdateOperatorAsync(Guid id, string fullName, Guid branchId, string? personnelNumber)
     {
         var entity = await db.Operators.FindAsync(id)
             ?? throw new InvalidOperationException("Машинист не найден");
-        entity.Update(fullName, personnelNumber);
+        entity.Update(fullName, branchId, personnelNumber);
         await db.SaveChangesAsync();
     }
 }

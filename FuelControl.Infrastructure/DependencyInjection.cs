@@ -1,5 +1,4 @@
-﻿using FuelControl.Infrastructure.Authorization;
-using FuelControl.Infrastructure.Identity;
+﻿using FuelControl.Infrastructure.Identity;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services;
 using FuelControl.Infrastructure.Services.Interfaces;

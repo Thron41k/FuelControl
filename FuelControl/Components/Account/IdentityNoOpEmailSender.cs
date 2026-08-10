@@ -1,4 +1,4 @@
-using FuelControl.Data;
+using FuelControl.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 

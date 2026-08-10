@@ -17,5 +17,11 @@ public sealed class FuelTruckConfiguration : IEntityTypeConfiguration<FuelTruck>
 
         builder.HasIndex(x => x.OmnicommObjectId);
         builder.HasIndex(x => x.RegistrationNumber).IsUnique();
+        builder.HasOne(x => x.Branch)
+            .WithMany()
+            .HasForeignKey(x => x.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.BranchId);
     }
 }

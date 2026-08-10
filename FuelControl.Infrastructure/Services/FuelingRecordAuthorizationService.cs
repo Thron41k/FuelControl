@@ -1,11 +1,10 @@
-﻿using FuelControl.Application.Authorization;
-using FuelControl.Infrastructure.Identity;
+﻿using FuelControl.Infrastructure.Identity;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelControl.Infrastructure.Authorization;
+namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelingRecordAuthorizationService(
     FuelControlDbContext dbContext,
@@ -90,10 +89,10 @@ public sealed class FuelingRecordAuthorizationService(
 
     private async Task<ApplicationUser?> GetCurrentUserAsync()
     {
-        if (string.IsNullOrWhiteSpace(currentUserService.UserId))
+        if (currentUserService.UserId is not { } userId)
             return null;
 
         return await userManager.FindByIdAsync(
-            currentUserService.UserId);
+            userId.ToString());
     }
 }

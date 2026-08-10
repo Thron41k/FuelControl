@@ -23,5 +23,11 @@ public sealed class OperatorConfiguration : IEntityTypeConfiguration<Operator>
             .IsRequired();
 
         builder.HasIndex(x => x.PersonnelNumber);
+        builder.HasOne(x => x.Branch)
+            .WithMany()
+            .HasForeignKey(x => x.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.BranchId);
     }
 }
