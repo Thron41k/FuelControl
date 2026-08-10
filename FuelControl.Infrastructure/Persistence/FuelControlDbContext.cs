@@ -6,14 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Persistence;
 
-public sealed class FuelControlDbContext
-    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
+public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
-    public FuelControlDbContext(DbContextOptions<FuelControlDbContext> options)
-        : base(options)
-    {
-    }
-
     public DbSet<FuelTruck> FuelTrucks => Set<FuelTruck>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Operator> Operators => Set<Operator>();
