@@ -47,7 +47,7 @@ public sealed class Vehicle
         BranchId = branch;
     }
 
-    public void SetOmnicommObjectId(long objectId)
+    public void SetOmnicommObjectId(long? objectId)
     {
         OmnicommObjectId = objectId;
     }

@@ -81,7 +81,7 @@ public static class DependencyInjection
         services.AddScoped<IOmnicommVehicleClient, OmnicommVehicleClient>();
         services.AddScoped<IOmnicommReportClient, OmnicommReportClient>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-
+        services.AddScoped<IVehicleService, VehicleService>();
         services.AddScoped<
             IFuelingRecordAuthorizationService,
             FuelingRecordAuthorizationService>();
