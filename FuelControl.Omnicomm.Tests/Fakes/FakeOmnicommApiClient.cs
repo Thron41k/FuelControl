@@ -53,6 +53,12 @@ internal sealed class FakeOmnicommApiClient : IOmnicommApiClient
         throw new NotSupportedException();
     }
 
+    public Task<TResponse?> PostFormAsync<TResponse>(string requestUri, IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
     public Task<T?> PostFormAsync<T>(string requestUri, IEnumerable<KeyValuePair<string, string>> formData, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();

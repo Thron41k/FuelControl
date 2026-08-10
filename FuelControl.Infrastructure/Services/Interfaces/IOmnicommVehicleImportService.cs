@@ -1,6 +1,6 @@
 ﻿using FuelControl.Omnicomm.Vehicles.Models;
 
-namespace FuelControl.Omnicomm.Vehicles;
+namespace FuelControl.Infrastructure.Services.Interfaces;
 
 public interface IOmnicommVehicleImportService
 {
