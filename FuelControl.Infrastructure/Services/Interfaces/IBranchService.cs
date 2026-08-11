@@ -28,4 +28,7 @@ public interface IBranchService
     Task ImportFromOmnicommAsync(
         IReadOnlyList<OmnicommBranchImportModel> branches,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Branch>> GetAvailableForCurrentUserAsync(
+        CancellationToken cancellationToken = default);
 }

@@ -137,6 +137,11 @@ public sealed class VehicleService(
             user,
             branchId);
 
+        await EnsureOmnicommObjectIsAvailableAsync(
+            omnicommObjectId,
+            null,
+            cancellationToken);
+
         var vehicle = new Vehicle(
             name.Trim(),
             registrationNumber.Trim(),
@@ -149,6 +154,30 @@ public sealed class VehicleService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return vehicle.Id;
+    }
+
+    private async Task EnsureOmnicommObjectIsAvailableAsync(
+        long? omnicommObjectId,
+        Guid? vehicleId,
+        CancellationToken cancellationToken)
+    {
+        if (omnicommObjectId is null)
+        {
+            return;
+        }
+
+        var exists = await dbContext.Vehicles
+            .AnyAsync(
+                x =>
+                    x.OmnicommObjectId == omnicommObjectId.Value &&
+                    (vehicleId == null || x.Id != vehicleId.Value),
+                cancellationToken);
+
+        if (exists)
+        {
+            throw new InvalidOperationException(
+                "Техника с таким объектом Omnicomm уже добавлена.");
+        }
     }
 
     public async Task UpdateAsync(
@@ -180,7 +209,10 @@ public sealed class VehicleService(
                     "Необходимо указать филиал.",
                     nameof(branchId));
             }
-
+            await EnsureOmnicommObjectIsAvailableAsync(
+                omnicommObjectId,
+                id,
+                cancellationToken);
             vehicle.Update(
                 name.Trim(),
                 registrationNumber.Trim(),

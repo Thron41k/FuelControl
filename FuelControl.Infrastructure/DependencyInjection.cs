@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<
             IFuelingRecordAuthorizationService,
             FuelingRecordAuthorizationService>();
+        services.AddScoped<IOperatorService, OperatorService>();
         services.AddScoped<DirectoryService>();
         services.AddScoped<FuelingRecordService>();
         return services;

@@ -29,7 +29,10 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasIndex(x => x.RegistrationNumber)
             .IsUnique();
 
-        builder.HasIndex(x => x.OmnicommObjectId);
+        builder.HasIndex(x => x.OmnicommObjectId)
+            .IsUnique()
+            .HasFilter("\"OmnicommObjectId\" IS NOT NULL");
+
         builder.HasOne(x => x.Branch)
             .WithMany()
             .HasForeignKey(x => x.BranchId)

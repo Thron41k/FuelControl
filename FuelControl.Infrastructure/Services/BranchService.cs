@@ -241,4 +241,52 @@ public sealed class BranchService(
 
         return name.Trim();
     }
+
+    public async Task<IReadOnlyList<Branch>> GetAvailableForCurrentUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserService.UserId is not { } userId)
+        {
+            throw new UnauthorizedAccessException(
+                "Пользователь не авторизован.");
+        }
+
+        var user = await userManager.FindByIdAsync(
+            userId.ToString());
+
+        if (user is null)
+        {
+            throw new UnauthorizedAccessException(
+                "Пользователь не найден.");
+        }
+
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            return await dbContext.Set<Branch>()
+                .AsNoTracking()
+                .OrderBy(x => x.Name)
+                .ToListAsync(cancellationToken);
+        }
+
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Dispatcher))
+        {
+            if (user.BranchId is null)
+            {
+                return [];
+            }
+
+            return await dbContext.Set<Branch>()
+                .AsNoTracking()
+                .Where(x => x.Id == user.BranchId.Value)
+                .OrderBy(x => x.Name)
+                .ToListAsync(cancellationToken);
+        }
+
+        throw new UnauthorizedAccessException(
+            "Недостаточно прав для просмотра филиалов.");
+    }
 }

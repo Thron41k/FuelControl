@@ -1,0 +1,607 @@
+@page "/drivers"
+@rendermode InteractiveServer
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Services.Interfaces
+
+@inject IOperatorService OperatorService
+@inject IBranchService BranchService
+
+<PageTitle>Водители</PageTitle>
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <h3 class="mb-0">
+            Водители
+        </h3>
+
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="OpenCreateDialog">
+
+            <span class="bi bi-plus-lg me-1"></span>
+
+            Добавить водителя
+
+        </button>
+
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+
+            @_errorMessage
+
+            <button type="button"
+                    class="btn-close"
+                    @onclick="ClearError">
+            </button>
+
+        </div>
+    }
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Поиск
+                </label>
+
+                <input type="search"
+                       class="form-control"
+                       placeholder="Введите ФИО..."
+                       @bind="_searchText"
+                       @bind:event="oninput" />
+
+            </div>
+
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-content-center p-5">
+
+                    <div class="spinner-border"
+                         role="status">
+
+                        <span class="visually-hidden">
+                            Загрузка...
+                        </span>
+
+                    </div>
+
+                </div>
+            }
+            else if (!FilteredOperators.Any())
+            {
+                <div class="text-center text-muted py-5">
+
+                    @if (string.IsNullOrWhiteSpace(_searchText))
+                    {
+                        <div>
+                            Водители отсутствуют.
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            По запросу «@_searchText» водители не найдены.
+                        </div>
+                    }
+
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    ФИО
+                                </th>
+                                <th>
+                                    Филиал(Организация)
+                                </th>
+                                <th>
+                                    Состояние
+                                </th>
+                                <th class="text-end">
+                                    Действия
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var driver in FilteredOperators)
+                            {
+                                <tr>
+
+                                    <td>
+                                        @driver.FullName
+                                    </td>
+                                <td>
+                                    @driver.Branch.Name
+                                </td>
+                                    <td>
+                                        @if (!driver.IsActive)
+                                        {
+                                            <span class="badge bg-secondary">
+                                                Неактивен
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">
+                                                Активен
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td class="text-end">
+
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                @onclick="() => OpenEditDialog(driver)">
+                                            <span class="bi bi-pencil"></span>
+                                            Изменить
+                                        </button>
+                                        @if (driver.IsActive)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => SetDriverActive(driver.Id, false)">
+                                                <span class="bi bi-pencil"></span>
+                                                Отключить
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-success"
+                                                    @onclick="() => SetDriverActive(driver.Id, true)">
+                                                <span class="bi bi-pencil"></span>
+                                                Включить
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => ConfirmDeleteDriver(driver)">
+                                                <span class="bi bi-pencil"></span>
+                                                Удалить
+                                            </button>
+                                        }
+
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+</div>
+
+@if (_driverToDelete is not null)
+{
+    <div class="modal fade show d-block"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Удаление водителя
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CancelDelete">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    Вы действительно хотите удалить водителя:
+
+                    <strong>
+                        @_driverToDelete.FullName
+                    </strong>?
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CancelDelete">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="DeleteConfirmed">
+
+                        Удалить
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+@if (_showDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0, 0, 0, 0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        @(_editingOperator is null
+                            ? "Добавление водителя"
+                            : "Редактирование водителя")
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseDialog"
+                            disabled="@_isSaving">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(_dialogErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @_dialogErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            ФИО
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Фамилия Имя Отчество"
+                               maxlength="200"
+                               @bind="_operatorFullName"
+                               @bind:event="oninput"
+                               disabled="@_isSaving" />
+
+                    </div>
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Филиал
+                        </label>
+
+                        <select class="form-select"
+                                @bind="_selectedBranchId"
+                                disabled="@_isSaving">
+
+                            <option value="">
+                                Выберите филиал
+                            </option>
+
+                            @foreach (var branch in _branches)
+                            {
+                                <option value="@branch.Id">
+                                    @branch.Name
+                                </option>
+                            }
+
+                        </select>
+
+                        @if (_selectedBranchId is null)
+                        {
+                            <div class="form-text text-danger">
+                                Необходимо выбрать филиал.
+                            </div>
+                        }
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseDialog"
+                            disabled="@_isSaving">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveOperator"
+                            disabled="@(!CanSaveOperator)">
+
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"
+                                  role="status">
+                            </span>
+                        }
+
+                        Сохранить
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+@code
+{
+    private Operator? _driverToDelete;
+    private IReadOnlyList<Branch> _branches = [];
+    private Guid? _selectedBranchId;
+    private IReadOnlyList<Operator> _operatorList = [];
+    private bool CanSaveOperator =>
+        !_isSaving &&
+        !string.IsNullOrWhiteSpace(_operatorFullName) &&
+        _selectedBranchId.HasValue;
+    private string _searchText = string.Empty;
+
+    private bool _isLoading;
+    private bool _isSaving;
+
+    private string? _errorMessage;
+    private string? _dialogErrorMessage;
+
+    private bool _showDialog;
+
+    private Operator? _editingOperator;
+
+    private string _operatorFullName = string.Empty;
+
+    private IEnumerable<Operator> FilteredOperators =>
+        _operatorList
+            .Where(MatchesSearch)
+            .OrderBy(x => x.FullName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranchesAsync();
+        await LoadOperatorsAsync();
+    }
+
+    private async Task LoadOperatorsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _operatorList = await OperatorService.GetAllAsync(includeInactive: true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool MatchesSearch(Operator @operator)
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            return true;
+        }
+
+        return @operator.FullName.Contains(
+            _searchText.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingOperator = null;
+
+        _operatorFullName = string.Empty;
+
+        _dialogErrorMessage = null;
+
+        _showDialog = true;
+
+        _selectedBranchId = null;
+    }
+
+    private async Task LoadBranchesAsync()
+    {
+        try
+        {
+            _branches = await BranchService.GetAvailableForCurrentUserAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+    private void OpenEditDialog(Operator driver)
+    {
+        _editingOperator = driver;
+
+        _operatorFullName = driver.FullName;
+
+        _dialogErrorMessage = null;
+        _selectedBranchId = driver.BranchId;
+        _showDialog = true;
+    }
+
+    private void CloseDialog()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _showDialog = false;
+
+        _editingOperator = null;
+
+        _operatorFullName = string.Empty;
+
+        _dialogErrorMessage = null;
+        _selectedBranchId = null;
+    }
+
+    private async Task SaveOperator()
+    {
+        var fullName = _operatorFullName.Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            _dialogErrorMessage = "Введите ФИО водителя.";
+            return;
+        }
+        if (_selectedBranchId is null)
+        {
+            _dialogErrorMessage = "Выберите филиал.";
+            return;
+        }
+        _isSaving = true;
+        _dialogErrorMessage = null;
+
+        try
+        {
+            if (_editingOperator is null)
+            {
+                await OperatorService.CreateAsync(
+                    fullName,
+                    _selectedBranchId.Value,
+                    null);
+            }
+            else
+            {
+                await OperatorService.UpdateAsync(
+                    _editingOperator.Id,
+                    fullName,
+                    _selectedBranchId.Value,
+                    null);
+            }
+
+            _showDialog = false;
+            _editingOperator = null;
+            _operatorFullName = string.Empty;
+            _selectedBranchId = null;
+            await LoadOperatorsAsync();
+        }
+        catch (Exception ex)
+        {
+            _dialogErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task SetDriverActive(
+        Guid id,
+        bool isActive)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await OperatorService.SetActiveAsync(
+                id,
+                isActive);
+
+            await LoadOperatorsAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+    private void ConfirmDeleteDriver(Operator driver)
+    {
+        _driverToDelete = driver;
+    }
+    private void CancelDelete()
+    {
+        _driverToDelete = null;
+    }
+
+    private async Task DeleteConfirmed()
+    {
+        if (_driverToDelete is null)
+        {
+            return;
+        }
+
+        var id = _driverToDelete.Id;
+
+        _driverToDelete = null;
+
+        await DeleteDriver(id);
+    }
+    private async Task DeleteDriver(Guid id)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await OperatorService.DeleteAsync(id);
+
+            await LoadOperatorsAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+    private void ClearError()
+    {
+        _errorMessage = null;
+    }
+}
