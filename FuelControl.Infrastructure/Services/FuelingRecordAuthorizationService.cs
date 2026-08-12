@@ -36,7 +36,7 @@ public sealed class FuelingRecordAuthorizationService(
         // Получаем филиал АТЗ.
         var fuelTruckBranchId = await dbContext.FuelTrucks
             .Where(x => x.Id == fuelTruckId)
-            .Select(x => (Guid?)x.BranchId)
+            .Select(x => (Guid?)x.Vehicle.BranchId)
             .SingleOrDefaultAsync(cancellationToken);
 
         if (fuelTruckBranchId is null)
@@ -69,7 +69,7 @@ public sealed class FuelingRecordAuthorizationService(
         // Получаем филиал АТЗ через FuelingRecord.
         var fuelTruckBranchId = await dbContext.FuelingRecords
             .Where(x => x.Id == fuelingRecordId)
-            .Select(x => (Guid?)x.FuelTruck.BranchId)
+            .Select(x => (Guid?)x.FuelTruck.Vehicle.BranchId)
             .SingleOrDefaultAsync(cancellationToken);
 
         if (fuelTruckBranchId is null)

@@ -4,24 +4,21 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FuelControl.Infrastructure.Persistence.Configurations;
 
-public sealed class FuelTruckConfiguration : IEntityTypeConfiguration<FuelTruck>
+public sealed class FuelTruckConfiguration
+    : IEntityTypeConfiguration<FuelTruck>
 {
     public void Configure(EntityTypeBuilder<FuelTruck> builder)
     {
         builder.ToTable("fuel_trucks");
+
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
-        builder.Property(x => x.RegistrationNumber).HasMaxLength(50).IsRequired();
-        builder.Property(x => x.InventoryNumber).HasMaxLength(50);
-
-        builder.HasIndex(x => x.OmnicommObjectId);
-        builder.HasIndex(x => x.RegistrationNumber).IsUnique();
-        builder.HasOne(x => x.Branch)
+        builder.HasOne(x => x.Vehicle)
             .WithMany()
-            .HasForeignKey(x => x.BranchId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => x.VehicleId)
+            .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(x => x.BranchId);
+        builder.HasIndex(x => x.VehicleId)
+            .IsUnique();
     }
 }

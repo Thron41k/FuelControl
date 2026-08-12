@@ -1,4 +1,5 @@
-﻿@implements IDisposable
+﻿@using FuelControl.Infrastructure.Identity
+@implements IDisposable
 @inject NavigationManager NavigationManager
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-fuelcontrol navbar-fuelcontrol">
@@ -28,7 +29,13 @@
                         <span class="bi bi-book" aria-hidden="true"></span> Справочники
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                        <li><NavLink class="dropdown-item" href="/tankers">Топливозаправщики</NavLink></li>
+                        <AuthorizeView Roles="@Roles.Admin">
+                            <ChildContent Context="adminContext">
+
+                                <li><NavLink class="dropdown-item" href="/fuel-trucks">Топливозаправщики</NavLink></li>
+
+                            </ChildContent>
+                        </AuthorizeView>
                         <li><NavLink class="dropdown-item" href="/drivers">Водители</NavLink></li>
                         <li><NavLink class="dropdown-item" href="/vehicles">Техника</NavLink></li>
                         <li><NavLink class="dropdown-item" href="/branches">Филиалы</NavLink></li>

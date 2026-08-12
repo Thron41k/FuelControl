@@ -6,26 +6,6 @@ namespace FuelControl.Infrastructure.Services;
 
 public sealed class DirectoryService(FuelControlDbContext db)
 {
-    // —— АТЗ ——
-    public Task<List<FuelTruck>> GetFuelTrucksAsync(bool onlyActive = true) =>
-        db.FuelTrucks
-            .Where(x => !onlyActive || x.IsActive)
-            .OrderBy(x => x.Name)
-            .ToListAsync();
-
-    public async Task CreateFuelTruckAsync(string name, string regNumber, Guid branchId, string? inventory)
-    {
-        db.FuelTrucks.Add(new FuelTruck(name, regNumber, branchId, inventory));
-        await db.SaveChangesAsync();
-    }
-
-    public async Task UpdateFuelTruckAsync(Guid id, string name, string regNumber, Guid branchId, string? inventory)
-    {
-        var entity = await db.FuelTrucks.FindAsync(id)
-            ?? throw new InvalidOperationException("АТЗ не найден");
-        entity.Update(name, regNumber, branchId, inventory);
-        await db.SaveChangesAsync();
-    }
 
 
     // —— Машинисты ——

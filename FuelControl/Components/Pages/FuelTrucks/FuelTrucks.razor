@@ -1,0 +1,839 @@
+﻿@page "/fuel-trucks"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = Roles.Admin)]
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
+@using FuelControl.Infrastructure.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+
+@inject IFuelTruckService FuelTruckVehicleService
+
+<PageTitle>Топливозаправщики</PageTitle>
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <div>
+            <h3 class="mb-1">
+                Топливозаправщики
+            </h3>
+
+            <div class="text-muted">
+                Техника, назначенная топливозаправщиками
+            </div>
+        </div>
+
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="OpenCreateDialog">
+
+            <span class="bi bi-plus-lg me-1"></span>
+
+            Добавить
+
+        </button>
+
+    </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+
+            @ErrorMessage
+
+            <button type="button"
+                    class="btn-close"
+                    @onclick="ClearError">
+            </button>
+
+        </div>
+    }
+
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Поиск
+                </label>
+
+                <input type="search"
+                       class="form-control"
+                       placeholder="Название, госномер или OmnicommId..."
+                       @bind="SearchText"
+                       @bind:event="oninput" />
+
+            </div>
+
+
+            @if (IsLoading)
+            {
+                <div class="d-flex justify-content-center py-5">
+
+                    <div class="spinner-border"
+                         role="status">
+
+                        <span class="visually-hidden">
+                            Загрузка...
+                        </span>
+
+                    </div>
+
+                </div>
+            }
+            else if (!FilteredFuelTrucks.Any())
+            {
+                <div class="text-center text-muted py-5">
+
+                    @if (string.IsNullOrWhiteSpace(SearchText))
+                    {
+                        <div>
+                            Топливозаправщики отсутствуют.
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            По запросу «@SearchText» ничего не найдено.
+                        </div>
+                    }
+
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead>
+                            <tr>
+
+                                <th>
+                                    Техника
+                                </th>
+
+                                <th>
+                                    Госномер
+                                </th>
+
+                                <th>
+                                    OmnicommId
+                                </th>
+
+                                <th>
+                                    Филиал
+                                </th>
+
+                                <th class="text-end">
+                                    Действия
+                                </th>
+
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var fuelTruck in FilteredFuelTrucks)
+                            {
+                                <tr>
+
+                                    <td>
+                                        @fuelTruck.Vehicle.Name
+                                    </td>
+
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(
+                                            fuelTruck.Vehicle.RegistrationNumber)
+                                            ? "—"
+                                            : fuelTruck.Vehicle.RegistrationNumber)
+                                    </td>
+
+                                    <td>
+                                        @(fuelTruck.Vehicle.OmnicommObjectId?.ToString() ?? "—")
+                                    </td>
+
+                                    <td>
+                                        @(fuelTruck.Vehicle.Branch?.Name ?? "—")
+                                    </td>
+
+                                    <td class="text-end">
+
+                                        <div class="btn-group">
+
+                                            <button class="btn btn-sm btn-outline-primary"
+                                                    @onclick="() => EditFuelTruck(fuelTruck.Id)">
+                                                <span class="bi bi-pencil"></span>
+                                                Изменить
+                                            </button>
+                                                <AuthorizeView Roles="@Roles.Admin">
+                                                    <ChildContent Context="adminContext">
+
+                                                        <button class="btn btn-sm btn-outline-danger"
+                                                                @onclick="() => ConfirmDelete(fuelTruck.Id)">
+
+                                                            <span class="bi bi-trash"></span>
+                                                            Удалить
+
+                                                        </button>
+
+                                                    </ChildContent>
+                                                </AuthorizeView>
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+</div>
+
+
+@if (ShowDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0, 0, 0, 0.5);">
+
+        <div class="modal-dialog modal-dialog-centered fuel-truck-modal">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        @(EditingFuelTruckId is null
+                            ? "Добавление топливозаправщика"
+                            : "Редактирование топливозаправщика")
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseDialog"
+                            disabled="@IsSaving">
+                    </button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(DialogErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @DialogErrorMessage
+                        </div>
+                    }
+
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Техника
+                        </label>
+
+                        <input type="search"
+                               class="form-control mb-3"
+                               placeholder="Поиск по названию, госномеру или OmnicommId..."
+                               @bind="VehicleSearchText"
+                               @bind:event="oninput"
+                               disabled="@IsSaving" />
+
+                        <div class="small text-muted mb-2">
+                            Найдено: @FilteredAvailableVehicles.Count()
+                        </div>
+
+                        <div class="table-responsive border rounded"
+                             style="max-height: 450px; overflow-y: auto;">
+
+                            <table class="table table-hover align-middle mb-0">
+
+                                <thead class="table-light"
+                                       style="position: sticky; top: 0; z-index: 1;">
+
+                                    <tr>
+
+                                        <th style="width: 35px;"></th>
+
+                                        <th style="width: 35%;">
+                                            Техника
+                                        </th>
+
+                                        <th style="width: 20%;">
+                                            Госномер
+                                        </th>
+
+                                        <th style="width: 20%;">
+                                            OmnicommId
+                                        </th>
+
+                                        <th style="width: 25%;">
+                                            Филиал
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var vehicle in FilteredAvailableVehicles)
+                                    {
+                                        <tr class="@(SelectedVehicleId == vehicle.Id
+                                                       ? "table-primary"
+                                                       : "")"
+                                            style="cursor: pointer;"
+                                            @onclick="() => SelectVehicle(vehicle)"
+                                            @ondblclick="() => SelectVehicleAndSave(vehicle)">
+
+                                            <td>
+
+                                                @if (SelectedVehicleId == vehicle.Id)
+                                                {
+                                                    <span class="bi bi-check-circle-fill text-primary">
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="bi bi-circle text-muted">
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                            <td>
+                                                <div class="fw-semibold">
+                                                    @vehicle.Name
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                @(string.IsNullOrWhiteSpace(
+                                                    vehicle.RegistrationNumber)
+                                                    ? "—"
+                                                    : vehicle.RegistrationNumber)
+                                            </td>
+
+                                            <td>
+                                                @(vehicle.OmnicommObjectId?.ToString() ?? "—")
+                                            </td>
+
+                                            <td>
+                                                @(vehicle.Branch?.Name ?? "—")
+                                            </td>
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                        @if (!FilteredAvailableVehicles.Any())
+                        {
+                            <div class="text-center text-muted py-4">
+                                Техника не найдена.
+                            </div>
+                        }
+
+                    </div>
+
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseDialog"
+                            disabled="@IsSaving">
+
+                        Отмена
+
+                    </button>
+
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveFuelTruck"
+                            disabled="@(!CanSave)">
+
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"
+                                  role="status">
+                            </span>
+                        }
+
+                        Сохранить
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        </div>
+    </div>
+}
+
+
+@if (FuelTruckToDelete is not null)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0, 0, 0, 0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Удаление топливозаправщика
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CancelDelete"
+                            disabled="@IsDeleting">
+                    </button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    <p>
+                        Вы действительно хотите убрать технику
+                        <strong>
+                            @FuelTruckToDelete.Vehicle.Name
+                        </strong>
+                        из списка топливозаправщиков?
+                    </p>
+
+                    <p class="text-muted mb-0">
+                        Сама техника удалена не будет.
+                    </p>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CancelDelete"
+                            disabled="@IsDeleting">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-danger"
+                            @onclick="DeleteFuelTruck"
+                            disabled="@IsDeleting">
+
+                        @if (IsDeleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"
+                                  role="status">
+                            </span>
+                        }
+
+                        Удалить
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+@code
+{
+    private string VehicleSearchText = string.Empty;
+
+    private IEnumerable<Vehicle> FilteredAvailableVehicles =>
+        AvailableVehicles
+            .Where(MatchesVehicleSearch)
+            .OrderBy(x => x.Name);
+    private IReadOnlyList<FuelTruck> FuelTruckList = [];
+    private IReadOnlyList<Vehicle> AvailableVehicles = [];
+
+    private string SearchText = string.Empty;
+
+    private Guid? SelectedVehicleId;
+    private Guid? EditingFuelTruckId;
+
+    private FuelTruck? FuelTruckToDelete;
+
+    private bool IsLoading;
+    private bool IsSaving;
+    private bool IsDeleting;
+    private bool ShowDialog;
+
+    private string? ErrorMessage;
+    private string? DialogErrorMessage;
+
+
+    private bool CanSave =>
+        !IsSaving &&
+        SelectedVehicleId.HasValue;
+
+
+    private IEnumerable<FuelTruck> FilteredFuelTrucks =>
+        FuelTruckList
+            .Where(MatchesSearch)
+            .OrderBy(x => x.Vehicle.Name);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFuelTrucksAsync();
+    }
+
+
+    private async Task LoadFuelTrucksAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            FuelTruckList =
+                await FuelTruckVehicleService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SelectVehicleAndSave(Vehicle vehicle)
+    {
+        if (IsSaving)
+        {
+            return;
+        }
+
+        SelectedVehicleId = vehicle.Id;
+
+        await SaveFuelTruck();
+    }
+
+    private bool MatchesVehicleSearch(Vehicle vehicle)
+    {
+        if (string.IsNullOrWhiteSpace(VehicleSearchText))
+        {
+            return true;
+        }
+
+        var search = VehicleSearchText.Trim();
+
+        return
+            vehicle.Name.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            (
+                vehicle.RegistrationNumber?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ?? false
+            )
+            ||
+            (
+                vehicle.OmnicommObjectId?
+                    .ToString()
+                    .Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                ?? false
+            );
+    }
+
+    private void SelectVehicle(Vehicle vehicle)
+    {
+        SelectedVehicleId = vehicle.Id;
+    }
+
+    private bool MatchesSearch(
+        FuelTruck fuelTruck)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            return true;
+        }
+
+        var search = SearchText.Trim();
+
+        return
+            fuelTruck.Vehicle.Name.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            (
+                fuelTruck.Vehicle.RegistrationNumber
+                    ?.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                ?? false
+            )
+            ||
+            (
+                fuelTruck.Vehicle.OmnicommObjectId
+                    ?.ToString()
+                    .Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                ?? false
+            );
+    }
+
+
+    private string GetVehicleDescription(
+        Vehicle vehicle)
+    {
+        var values = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(
+                vehicle.RegistrationNumber))
+        {
+            values.Add(
+                vehicle.RegistrationNumber);
+        }
+
+        if (vehicle.OmnicommObjectId.HasValue)
+        {
+            values.Add(
+                $"OmnicommId: {vehicle.OmnicommObjectId.Value}");
+        }
+
+        if (values.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return $" — {string.Join(", ", values)}";
+    }
+
+
+    private async Task OpenCreateDialog()
+    {
+        EditingFuelTruckId = null;
+
+        SelectedVehicleId = null;
+        VehicleSearchText = string.Empty;
+
+        DialogErrorMessage = null;
+
+        try
+        {
+            AvailableVehicles =
+                await FuelTruckVehicleService
+                    .GetAvailableVehiclesAsync();
+
+            ShowDialog = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+
+    private async Task EditFuelTruck(Guid id)
+    {
+        var fuelTruck = FuelTruckList
+            .FirstOrDefault(x => x.Id == id);
+
+        if (fuelTruck is null)
+        {
+            return;
+        }
+
+        EditingFuelTruckId = fuelTruck.Id;
+
+        SelectedVehicleId = fuelTruck.VehicleId;
+        VehicleSearchText = string.Empty;
+
+        DialogErrorMessage = null;
+
+        try
+        {
+            AvailableVehicles =
+                await FuelTruckVehicleService
+                    .GetAvailableVehiclesAsync();
+
+            // При редактировании текущая техника
+            // должна остаться в списке.
+            if (AvailableVehicles.All(
+                    x => x.Id != fuelTruck.VehicleId))
+            {
+                AvailableVehicles = AvailableVehicles
+                    .Append(fuelTruck.Vehicle)
+                    .OrderBy(x => x.Name)
+                    .ToList();
+            }
+
+            ShowDialog = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+
+    private void CloseDialog()
+    {
+        if (IsSaving)
+        {
+            return;
+        }
+
+        ShowDialog = false;
+
+        EditingFuelTruckId = null;
+        SelectedVehicleId = null;
+
+        VehicleSearchText = string.Empty;
+
+        AvailableVehicles = [];
+
+        DialogErrorMessage = null;
+    }
+
+
+    private async Task SaveFuelTruck()
+    {
+        if (SelectedVehicleId is null)
+        {
+            DialogErrorMessage =
+                "Выберите технику.";
+
+            return;
+        }
+
+        IsSaving = true;
+        DialogErrorMessage = null;
+
+        try
+        {
+            if (EditingFuelTruckId is null)
+            {
+                await FuelTruckVehicleService.CreateAsync(
+                    SelectedVehicleId.Value);
+            }
+            else
+            {
+                await FuelTruckVehicleService.UpdateAsync(
+                    EditingFuelTruckId.Value,
+                    SelectedVehicleId.Value);
+            }
+
+            ShowDialog = false;
+
+            EditingFuelTruckId = null;
+            SelectedVehicleId = null;
+            AvailableVehicles = [];
+
+            await LoadFuelTrucksAsync();
+        }
+        catch (Exception ex)
+        {
+            DialogErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+
+    private void ConfirmDelete(Guid id)
+    {
+        FuelTruckToDelete =
+            FuelTruckList.FirstOrDefault(
+                x => x.Id == id);
+    }
+
+
+    private void CancelDelete()
+    {
+        if (IsDeleting)
+        {
+            return;
+        }
+
+        FuelTruckToDelete = null;
+    }
+
+
+    private async Task DeleteFuelTruck()
+    {
+        if (FuelTruckToDelete is null)
+        {
+            return;
+        }
+
+        var id = FuelTruckToDelete.Id;
+
+        IsDeleting = true;
+        ErrorMessage = null;
+
+        try
+        {
+            await FuelTruckVehicleService.DeleteAsync(id);
+
+            FuelTruckToDelete = null;
+
+            await LoadFuelTrucksAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsDeleting = false;
+        }
+    }
+
+
+    private void ClearError()
+    {
+        ErrorMessage = null;
+    }
+}

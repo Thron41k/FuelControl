@@ -1,0 +1,14 @@
+﻿.fuel-truck-modal {
+    width: 1000px;
+    max-width: calc(100vw - 2rem);
+    height: 1400px;
+    max-height: calc(100vh - 5rem);
+}
+
+    .fuel-truck-modal .modal-content {
+        height: 100%;
+    }
+
+    .fuel-truck-modal .modal-body {
+        overflow-y: auto;
+    }

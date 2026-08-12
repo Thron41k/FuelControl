@@ -93,6 +93,9 @@ public static class DependencyInjection
         services.AddScoped<IOperatorService, OperatorService>();
         services.AddScoped<DirectoryService>();
         services.AddScoped<FuelingRecordService>();
+        services.AddScoped<
+            IFuelTruckService,
+            FuelTruckService>();
         return services;
     }
 }

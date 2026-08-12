@@ -168,7 +168,7 @@ public sealed class BranchService(
 
         var hasFuelTrucks = await dbContext.FuelTrucks
             .AnyAsync(
-                x => x.BranchId == id,
+                x => x.Vehicle.BranchId == id,
                 cancellationToken);
 
         if (hasFuelTrucks)

@@ -77,7 +77,19 @@ public sealed class VehicleService(
             throw new InvalidOperationException(
                 "Активную технику нельзя удалить. Сначала отключите её.");
         }
+        var isFuelTruck = await dbContext
+            .Set<FuelTruck>()
+            .AnyAsync(
+                x => x.VehicleId == id,
+                cancellationToken);
 
+        if (isFuelTruck)
+        {
+            throw new InvalidOperationException(
+                "Нельзя удалить технику, поскольку она числится " +
+                "топливозаправщиком. Сначала удалите её из " +
+                "справочника топливозаправщиков.");
+        }
         var hasFuelingRecords = await dbContext.Set<FuelingRecord>()
             .AnyAsync(
                 x => x.VehicleId == id,
