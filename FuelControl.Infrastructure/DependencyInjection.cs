@@ -92,10 +92,11 @@ public static class DependencyInjection
             FuelingRecordAuthorizationService>();
         services.AddScoped<IOperatorService, OperatorService>();
         services.AddScoped<DirectoryService>();
-        services.AddScoped<FuelingRecordService>();
+        services.AddScoped<IFuelingRecordService,FuelingRecordService>();
         services.AddScoped<
             IFuelTruckService,
             FuelTruckService>();
+        services.AddScoped<IFuelingUssService, FuelingUssService>();
         return services;
     }
 }

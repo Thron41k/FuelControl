@@ -15,6 +15,7 @@ public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> 
     public DbSet<FuelingRecord> FuelingRecords => Set<FuelingRecord>();
     public DbSet<DeliveryMatch> DeliveryMatches => Set<DeliveryMatch>();
     public DbSet<FuelEventMatch> FuelEventMatches => Set<FuelEventMatch>();
+    public DbSet<FuelingUssRecord> FuelingUssRecords => Set<FuelingUssRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

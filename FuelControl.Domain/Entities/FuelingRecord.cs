@@ -10,7 +10,9 @@ public sealed class FuelingRecord
 
     public DateTimeOffset FuelingDateTime { get; private set; }
 
-    /// <summary>Объём, литры (целое).</summary>
+    /// <summary>
+    /// Объём заправки, литры.
+    /// </summary>
     public int Volume { get; private set; }
 
     public int CounterStart { get; private set; }
@@ -26,7 +28,16 @@ public sealed class FuelingRecord
     public Vehicle Vehicle { get; private set; } = null!;
     public Operator Operator { get; private set; } = null!;
 
-    private FuelingRecord() { }
+    /// <summary>
+    /// Показания УСС, привязанные к данной заправке.
+    /// Одна заправка может иметь несколько записей УСС.
+    /// </summary>
+    public ICollection<FuelingUssRecord> UssRecords { get; private set; }
+        = new List<FuelingUssRecord>();
+
+    private FuelingRecord()
+    {
+    }
 
     public FuelingRecord(
         Guid fuelTruckId,
@@ -38,21 +49,61 @@ public sealed class FuelingRecord
         int counterEnd,
         Guid createdBy)
     {
+        if (fuelTruckId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указан топливозаправщик.",
+                nameof(fuelTruckId));
+        }
+
+        if (vehicleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указана техника.",
+                nameof(vehicleId));
+        }
+
+        if (operatorId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указан водитель.",
+                nameof(operatorId));
+        }
+
         if (volume <= 0)
-            throw new ArgumentOutOfRangeException(nameof(volume));
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(volume),
+                "Объём заправки должен быть больше нуля.");
+        }
+
+        if (counterStart < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(counterStart),
+                "Начальное показание счётчика не может быть отрицательным.");
+        }
 
         if (counterEnd < counterStart)
+        {
             throw new ArgumentException(
-                "Конечное показание счётчика не может быть меньше начального.");
+                "Конечное показание счётчика не может быть меньше начального.",
+                nameof(counterEnd));
+        }
 
         Id = Guid.NewGuid();
+
         FuelTruckId = fuelTruckId;
         VehicleId = vehicleId;
         OperatorId = operatorId;
+
         FuelingDateTime = fuelingDateTime;
+
         Volume = volume;
+
         CounterStart = counterStart;
         CounterEnd = counterEnd;
+
         CreatedAt = DateTimeOffset.UtcNow;
         CreatedBy = createdBy;
     }
@@ -67,20 +118,59 @@ public sealed class FuelingRecord
         int counterEnd,
         Guid updatedBy)
     {
+        if (fuelTruckId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указан топливозаправщик.",
+                nameof(fuelTruckId));
+        }
+
+        if (vehicleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указана техника.",
+                nameof(vehicleId));
+        }
+
+        if (operatorId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указан водитель.",
+                nameof(operatorId));
+        }
+
         if (volume <= 0)
-            throw new ArgumentOutOfRangeException(nameof(volume));
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(volume),
+                "Объём заправки должен быть больше нуля.");
+        }
+
+        if (counterStart < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(counterStart),
+                "Начальное показание счётчика не может быть отрицательным.");
+        }
 
         if (counterEnd < counterStart)
+        {
             throw new ArgumentException(
-                "Конечное показание счётчика не может быть меньше начального.");
+                "Конечное показание счётчика не может быть меньше начального.",
+                nameof(counterEnd));
+        }
 
         FuelTruckId = fuelTruckId;
         VehicleId = vehicleId;
         OperatorId = operatorId;
+
         FuelingDateTime = fuelingDateTime;
+
         Volume = volume;
+
         CounterStart = counterStart;
         CounterEnd = counterEnd;
+
         UpdatedAt = DateTimeOffset.UtcNow;
         UpdatedBy = updatedBy;
     }

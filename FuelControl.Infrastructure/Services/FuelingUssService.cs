@@ -1,0 +1,297 @@
+﻿using FuelControl.Domain.Entities;
+using FuelControl.Infrastructure.Persistence;
+using FuelControl.Infrastructure.Services.Interfaces;
+using FuelControl.Omnicomm.Reports;
+using FuelControl.Omnicomm.Reports.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace FuelControl.Infrastructure.Services;
+
+public sealed class FuelingUssService(
+    FuelControlDbContext dbContext,
+    ICurrentUserService currentUserService,
+    IOmnicommReportClient omnicommReportClient)
+    : IFuelingUssService
+{
+    public async Task<IReadOnlyList<OmnicommDeliveryEvent>> GetAvailableEventsAsync(
+        Guid fuelTruckId,
+        DateOnly date,
+        CancellationToken cancellationToken = default)
+    {
+        _ = GetCurrentUserId();
+
+        var fuelTruck = await dbContext.FuelTrucks
+            .AsNoTracking()
+            .Include(x => x.Vehicle)
+            .SingleOrDefaultAsync(
+                x => x.Id == fuelTruckId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Топливозаправщик не найден.");
+
+        if (fuelTruck.Vehicle is null)
+        {
+            throw new InvalidOperationException(
+                "За топливозаправщиком не закреплена техника.");
+        }
+
+        if (fuelTruck.Vehicle.OmnicommObjectId is not { } omnicommId)
+        {
+            throw new InvalidOperationException(
+                "У техники топливозаправщика не указан OmnicommId.");
+        }
+
+        var (from, to) = GetDayRange(date);
+
+        var report = await omnicommReportClient.GetDeliveryReportAsync(
+            [omnicommId],
+            from,
+            to,
+            cancellationToken: cancellationToken);
+
+        var events = report.Events
+            .Where(x => x.VehicleId == omnicommId)
+            .OrderBy(x => x.StartDate)
+            .ToList();
+
+        if (events.Count == 0)
+        {
+            return [];
+        }
+
+        /*
+         * Получаем события, которые уже были привязаны
+         * к каким-либо заправкам.
+         */
+        var eventIds = events
+            .Select(x => x.Id)
+            .ToList();
+
+        var attachedEventIds = await dbContext.FuelingUssRecords
+            .AsNoTracking()
+            .Where(x => eventIds.Contains(x.OmnicommEventId))
+            .Select(x => x.OmnicommEventId)
+            .ToListAsync(cancellationToken);
+
+        if (attachedEventIds.Count == 0)
+        {
+            return events;
+        }
+
+        var attached = attachedEventIds.ToHashSet();
+
+        return events
+            .Where(x => !attached.Contains(x.Id))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<FuelingUssRecord>> GetByFuelingRecordIdAsync(
+        Guid fuelingRecordId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = GetCurrentUserId();
+
+        return await dbContext.FuelingUssRecords
+            .AsNoTracking()
+            .Where(x => x.FuelingRecordId == fuelingRecordId)
+            .OrderBy(x => x.StartDate)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AttachAsync(
+        Guid fuelingRecordId,
+        IReadOnlyList<int> omnicommEventIds,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+
+        ArgumentNullException.ThrowIfNull(omnicommEventIds);
+
+        var selectedIds = omnicommEventIds
+            .Distinct()
+            .ToHashSet();
+
+        if (selectedIds.Count == 0)
+        {
+            throw new ArgumentException(
+                "Не выбраны показания УСС.",
+                nameof(omnicommEventIds));
+        }
+
+        var fuelingRecord = await dbContext.FuelingRecords
+            .SingleOrDefaultAsync(
+                x => x.Id == fuelingRecordId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Заправка не найдена.");
+
+        var fuelTruck = await dbContext.FuelTrucks
+            .AsNoTracking()
+            .Include(x => x.Vehicle)
+            .SingleOrDefaultAsync(
+                x => x.Id == fuelingRecord.FuelTruckId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Топливозаправщик не найден.");
+
+        if (fuelTruck.Vehicle is null)
+        {
+            throw new InvalidOperationException(
+                "За топливозаправщиком не закреплена техника.");
+        }
+
+        if (fuelTruck.Vehicle.OmnicommObjectId is not { } omnicommId)
+        {
+            throw new InvalidOperationException(
+                "У техники топливозаправщика не указан OmnicommId.");
+        }
+
+        var (from, to) = GetDayRange(
+            DateOnly.FromDateTime(
+                fuelingRecord.FuelingDateTime.DateTime));
+
+        /*
+         * Получаем актуальный отчёт непосредственно перед
+         * сохранением привязки.
+         */
+        var report = await omnicommReportClient.GetDeliveryReportAsync(
+            [omnicommId],
+            from,
+            to,
+            cancellationToken: cancellationToken);
+
+        var selectedEvents = report.Events
+            .Where(x =>
+                selectedIds.Contains(x.Id) &&
+                x.VehicleId == omnicommId)
+            .ToList();
+
+        if (selectedEvents.Count != selectedIds.Count)
+        {
+            var foundIds = selectedEvents
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            var missingIds = selectedIds
+                .Where(x => !foundIds.Contains(x))
+                .ToArray();
+
+            throw new InvalidOperationException(
+                "Некоторые выбранные показания УСС не найдены " +
+                $"или относятся к другому топливозаправщику. " +
+                $"ID: {string.Join(", ", missingIds)}.");
+        }
+
+        /*
+         * Проверяем, не были ли события уже привязаны
+         * к другой заправке.
+         */
+        var alreadyAttached = await dbContext.FuelingUssRecords
+            .AsNoTracking()
+            .Where(x =>
+                selectedIds.Contains(x.OmnicommEventId))
+            .Select(x => new
+            {
+                x.OmnicommEventId,
+                x.FuelingRecordId
+            })
+            .ToListAsync(cancellationToken);
+
+        if (alreadyAttached.Count > 0)
+        {
+            var ids = alreadyAttached
+                .Select(x => x.OmnicommEventId)
+                .Distinct()
+                .Order()
+                .ToArray();
+
+            throw new InvalidOperationException(
+                "Некоторые показания УСС уже привязаны " +
+                "к другой заправке. " +
+                $"ID: {string.Join(", ", ids)}.");
+        }
+
+        foreach (var deliveryEvent in selectedEvents)
+        {
+            var ussRecord = new FuelingUssRecord(
+                fuelingRecord.Id,
+                deliveryEvent.Id,
+                report.ReportId,
+                deliveryEvent.VehicleId,
+                deliveryEvent.Name,
+                deliveryEvent.VolumeLiters,
+                deliveryEvent.StartDate,
+                deliveryEvent.EndDate,
+                userId);
+
+            dbContext.FuelingUssRecords.Add(ussRecord);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DetachAsync(
+        Guid fuelingUssRecordId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = GetCurrentUserId();
+
+        var ussRecord = await dbContext.FuelingUssRecords
+            .SingleOrDefaultAsync(
+                x => x.Id == fuelingUssRecordId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Показание УСС не найдено.");
+
+        dbContext.FuelingUssRecords.Remove(ussRecord);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (currentUserService.UserId is not { } userId)
+        {
+            throw new UnauthorizedAccessException(
+                "Пользователь не авторизован.");
+        }
+
+        return userId;
+    }
+
+    private static (
+        DateTimeOffset From,
+        DateTimeOffset To) GetDayRange(
+        DateOnly date)
+    {
+        /*
+         * Omnicomm работает с часовым поясом Asia/Chita.
+         *
+         * Поэтому дата пользователя сначала переводится
+         * в начало/конец дня этого часового пояса,
+         * после чего отправляется в API как Unix time.
+         */
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
+            "Asia/Chita");
+
+        var localStart = date.ToDateTime(
+            TimeOnly.MinValue,
+            DateTimeKind.Unspecified);
+
+        var localEnd = date
+            .AddDays(1)
+            .ToDateTime(
+                TimeOnly.MinValue,
+                DateTimeKind.Unspecified);
+
+        var from = new DateTimeOffset(
+            localStart,
+            timeZone.GetUtcOffset(localStart));
+
+        var to = new DateTimeOffset(
+            localEnd,
+            timeZone.GetUtcOffset(localEnd));
+
+        return (from, to);
+    }
+}
