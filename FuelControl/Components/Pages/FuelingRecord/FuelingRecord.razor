@@ -206,23 +206,16 @@
                                     </td>
 
                                     <td class="text-end">
-
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-primary me-1"
+                                        <button class="btn btn-sm btn-outline-primary"
                                                 @onclick="() => OpenEditDialog(record)">
-
-                                            <i class="bi bi-pencil"></i>
-
+                                            <span class="bi bi-pencil"></span>
+                                            Изменить
                                         </button>
-
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger"
-                                                @onclick="() => DeleteAsync(record)">
-
-                                            <i class="bi bi-trash"></i>
-
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => OpenDeleteDialog(record)">
+                                            <span class="bi bi-trash"></span>
+                                            Удалить
                                         </button>
-
                                     </td>
 
                                 </tr>
@@ -270,210 +263,298 @@
          tabindex="-1"
          style="background-color: rgba(0,0,0,.5);">
 
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+
+    <div class="modal-content">
+
+    <div class="modal-header">
+
+        <h5 class="modal-title">
+
+            @(editingRecord is null
+                ? "Добавление заправки"
+                : "Редактирование заправки")
+
+        </h5>
+
+        <button type="button"
+                class="btn-close"
+                @onclick="CloseDialog">
+        </button>
+
+    </div>
+
+    <div class="modal-body">
+
+        <div class="row g-3">
+
+            <!-- Дата -->
+
+            <div class="col-md-6">
+
+                <label class="form-label">
+                    Дата
+                </label>
+
+                <input type="date"
+                       class="form-control"
+                       @bind="dialogDate" />
+
+            </div>
+
+
+            <!-- Время -->
+
+            <div class="col-md-6">
+
+                <label class="form-label">
+                    Время
+                </label>
+
+                <input type="time"
+                       class="form-control"
+                       @bind="dialogTime" />
+
+            </div>
+
+
+            <!-- Техника -->
+
+            <div class="col-md-12">
+
+                <label class="form-label">
+                    Техника
+                </label>
+
+                <div class="input-group">
+
+                    <input class="form-control"
+                           readonly
+                           value="@GetSelectedVehicleName()"
+                           placeholder="Техника не выбрана" />
+
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="OpenVehicleDialog">
+
+                        Выбрать
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- Водитель -->
+
+            <div class="col-md-12">
+
+                <label class="form-label">
+                    Водитель
+                </label>
+
+                <div class="input-group">
+
+                    <input class="form-control"
+                           readonly
+                           value="@GetSelectedOperatorName()"
+                           placeholder="Водитель не выбран" />
+
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="OpenOperatorDialog">
+
+                        Выбрать
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- Счётчик -->
+
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Начальные показания
+                </label>
+
+                <input type="number"
+                       class="form-control"
+                       min="0"
+                       @bind="dialogCounterStart" />
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Конечные показания
+                </label>
+
+                <input type="number"
+                       class="form-control"
+                       min="0"
+                       @bind="dialogCounterEnd" />
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Объём, л
+                </label>
+
+                <input type="number"
+                       class="form-control"
+                       min="1"
+                       @bind="dialogVolume" />
+
+            </div>
+
+
+            <!-- УСС -->
+
+            <div class="col-md-12">
+
+                <label class="form-label">
+                    Показания УСС
+                </label>
+
+                <div class="input-group">
+
+                    <input class="form-control"
+                           readonly
+                           value="@GetUssSelectionText()"
+                           placeholder="Показания УСС не выбраны" />
+
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            disabled="@(!CanSelectUss)"
+                            @onclick="OpenUssDialog">
+
+                        Выбрать показания УСС
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="modal-footer">
+
+        <button type="button"
+                class="btn btn-secondary"
+                @onclick="CloseDialog">
+
+            Отмена
+
+        </button>
+
+        <button type="button"
+                class="btn btn-primary"
+                disabled="@(!CanSave)"
+                @onclick="SaveAsync">
+
+            Сохранить
+
+        </button>
+
+    </div>
+
+    </div>
+
+    </div>
+
+    </div>
+}
+@if (showDeleteDialog && recordToDelete is not null)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
 
             <div class="modal-content">
 
                 <div class="modal-header">
 
                     <h5 class="modal-title">
-
-                        @(editingRecord is null
-                            ? "Добавление заправки"
-                            : "Редактирование заправки")
-
+                        Подтверждение удаления
                     </h5>
 
                     <button type="button"
                             class="btn-close"
-                            @onclick="CloseDialog">
+                            @onclick="CloseDeleteDialog">
                     </button>
 
                 </div>
 
                 <div class="modal-body">
 
-                    <div class="row g-3">
+                    <p class="mb-3">
+                        Вы действительно хотите удалить эту заправку?
+                    </p>
 
-                        <!-- Дата -->
+                    <div class="border rounded p-3">
 
-                        <div class="col-md-6">
-
-                            <label class="form-label">
-                                Дата
-                            </label>
-
-                            <input type="date"
-                                   class="form-control"
-                                   @bind="dialogDate" />
-
+                        <div>
+                            <strong>Дата:</strong>
+                            @FormatLocalDateTime(
+                                recordToDelete.FuelingDateTime)
                         </div>
 
-
-                        <!-- Время -->
-
-                        <div class="col-md-6">
-
-                            <label class="form-label">
-                                Время
-                            </label>
-
-                            <input type="time"
-                                   class="form-control"
-                                   @bind="dialogTime" />
-
+                        <div>
+                            <strong>Техника:</strong>
+                            @recordToDelete.Vehicle?.Name
                         </div>
 
-
-                        <!-- Техника -->
-
-                        <div class="col-md-12">
-
-                            <label class="form-label">
-                                Техника
-                            </label>
-
-                            <div class="input-group">
-
-                                <input class="form-control"
-                                       readonly
-                                       value="@GetSelectedVehicleName()"
-                                       placeholder="Техника не выбрана" />
-
-                                <button type="button"
-                                        class="btn btn-outline-primary"
-                                        @onclick="OpenVehicleDialog">
-
-                                    Выбрать
-
-                                </button>
-
-                            </div>
-
+                        <div>
+                            <strong>Водитель:</strong>
+                            @recordToDelete.Operator?.FullName
                         </div>
 
-
-                        <!-- Водитель -->
-
-                        <div class="col-md-12">
-
-                            <label class="form-label">
-                                Водитель
-                            </label>
-
-                            <div class="input-group">
-
-                                <input class="form-control"
-                                       readonly
-                                       value="@GetSelectedOperatorName()"
-                                       placeholder="Водитель не выбран" />
-
-                                <button type="button"
-                                        class="btn btn-outline-primary"
-                                        @onclick="OpenOperatorDialog">
-
-                                    Выбрать
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-
-                        <!-- Счётчик -->
-
-                        <div class="col-md-4">
-
-                            <label class="form-label">
-                                Начальные показания
-                            </label>
-
-                            <input type="number"
-                                   class="form-control"
-                                   min="0"
-                                   @bind="dialogCounterStart" />
-
-                        </div>
-
-
-                        <div class="col-md-4">
-
-                            <label class="form-label">
-                                Конечные показания
-                            </label>
-
-                            <input type="number"
-                                   class="form-control"
-                                   min="0"
-                                   @bind="dialogCounterEnd" />
-
-                        </div>
-
-
-                        <div class="col-md-4">
-
-                            <label class="form-label">
-                                Объём, л
-                            </label>
-
-                            <input type="number"
-                                   class="form-control"
-                                   min="1"
-                                   @bind="dialogVolume" />
-
-                        </div>
-
-
-                        <!-- УСС -->
-
-                        <div class="col-md-12">
-
-                            <label class="form-label">
-                                Показания УСС
-                            </label>
-
-                            <div class="input-group">
-
-                                <input class="form-control"
-                                       readonly
-                                       value="@GetUssSelectionText()"
-                                       placeholder="Показания УСС не выбраны" />
-
-                                <button type="button"
-                                        class="btn btn-outline-primary"
-                                        disabled="@(!CanSelectUss)"
-                                        @onclick="OpenUssDialog">
-
-                                    Выбрать показания УСС
-
-                                </button>
-
-                            </div>
-
+                        <div>
+                            <strong>Объём:</strong>
+                            @recordToDelete.Volume л
                         </div>
 
                     </div>
 
-                </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        После удаления восстановить запись будет невозможно.
+                    </div>
 
+                </div>
 
                 <div class="modal-footer">
 
                     <button type="button"
                             class="btn btn-secondary"
-                            @onclick="CloseDialog">
+                            @onclick="CloseDeleteDialog">
 
                         Отмена
 
                     </button>
 
                     <button type="button"
-                            class="btn btn-primary"
-                            disabled="@(!CanSave)"
-                            @onclick="SaveAsync">
+                            class="btn btn-danger"
+                            @onclick="ConfirmDeleteAsync">
 
-                        Сохранить
+                        <i class="bi bi-trash me-1"></i>
+
+                        Удалить
 
                     </button>
 
@@ -486,9 +567,10 @@
     </div>
 }
 
-
 @code {
+    private bool showDeleteDialog;
 
+    private FuelControl.Domain.Entities.FuelingRecord? recordToDelete;
     private readonly List<FuelTruck> fuelTrucks = [];
     private readonly List<Vehicle> vehicles = [];
     private readonly List<Operator> operators = [];
@@ -724,6 +806,10 @@
         showVehicleDialog = false;
 
         showOperatorDialog = false;
+
+        showDeleteDialog = false;
+
+        recordToDelete = null;
     }
 
 
@@ -917,6 +1003,47 @@
         }
     }
 
+    private void OpenDeleteDialog(FuelControl.Domain.Entities.FuelingRecord record)
+    {
+        errorMessage = null;
+
+        recordToDelete = record;
+
+        showDeleteDialog = true;
+    }
+
+    private void CloseDeleteDialog()
+    {
+        showDeleteDialog = false;
+
+        recordToDelete = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (recordToDelete is null)
+            return;
+
+        errorMessage = null;
+
+        try
+        {
+            var recordId = recordToDelete.Id;
+
+            showDeleteDialog = false;
+            recordToDelete = null;
+
+            await FuelingRecordService.DeleteAsync(
+                recordId,
+                CancellationToken.None);
+
+            await LoadFuelingRecordsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
 
     private async Task DeleteAsync(
         FuelControl.Domain.Entities.FuelingRecord record)
