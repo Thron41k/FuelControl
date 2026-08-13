@@ -12,33 +12,35 @@ public sealed class FuelingRecordService(
 {
     public async Task<IReadOnlyList<FuelingRecord>> GetAllAsync(
         DateOnly date,
+        TimeZoneInfo timeZone,
         Guid? fuelTruckId = null,
         CancellationToken cancellationToken = default)
     {
-        var start = new DateTimeOffset(
-            date.ToDateTime(TimeOnly.MinValue),
-            TimeSpan.Zero);
+        var localStart = date.ToDateTime(
+            TimeOnly.MinValue);
 
-        var end = start.AddDays(1);
+        var localEnd = date
+            .AddDays(1)
+            .ToDateTime(TimeOnly.MinValue);
 
-        var query = dbContext.FuelingRecords
+        var utcStart = new DateTimeOffset(
+                localStart,
+                timeZone.GetUtcOffset(localStart))
+            .ToUniversalTime();
+
+        var utcEnd = new DateTimeOffset(
+                localEnd,
+                timeZone.GetUtcOffset(localEnd))
+            .ToUniversalTime();
+
+        return await dbContext.FuelingRecords
             .AsNoTracking()
-            .Include(x => x.FuelTruck)
-            .ThenInclude(x => x.Vehicle)
             .Include(x => x.Vehicle)
             .Include(x => x.Operator)
-            .Include(x => x.UssRecords)
             .Where(x =>
-                x.FuelingDateTime >= start &&
-                x.FuelingDateTime < end);
-
-        if (fuelTruckId.HasValue)
-        {
-            query = query.Where(x =>
-                x.FuelTruckId == fuelTruckId.Value);
-        }
-
-        return await query
+                x.FuelTruckId == fuelTruckId &&
+                x.FuelingDateTime >= utcStart &&
+                x.FuelingDateTime < utcEnd)
             .OrderBy(x => x.FuelingDateTime)
             .ToListAsync(cancellationToken);
     }

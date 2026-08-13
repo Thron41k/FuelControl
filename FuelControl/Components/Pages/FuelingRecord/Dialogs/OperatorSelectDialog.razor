@@ -1,0 +1,158 @@
+﻿@using FuelControl.Domain.Entities
+@if (Visible)
+{
+    <div class="modal fade show d-block vehicle-select-modal"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Выбор водителя
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseAsync">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+
+                        <input type="search"
+                               class="form-control"
+                               placeholder="Поиск водителя..."
+                               @bind="searchText"
+                               @bind:event="oninput"
+                               autofocus />
+
+                    </div>
+
+                    <div class="list-group">
+
+                        @foreach (var driver in FilteredOperators)
+                        {
+                            <button type="button"
+                                    class="list-group-item list-group-item-action"
+                                    @ondblclick="() => SelectAsync(driver.Id)">
+
+                                <div class="fw-semibold">
+                                    @driver.FullName
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    driver.PersonnelNumber))
+                                {
+                                    <small class="text-muted">
+                                        Табельный номер:
+                                        @driver.PersonnelNumber
+                                    </small>
+                                }
+
+                            </button>
+                        }
+
+                    </div>
+
+                    @if (!FilteredOperators.Any())
+                    {
+                        <div class="text-center text-muted py-4">
+                            Водитель не найден.
+                        </div>
+                    }
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseAsync">
+                        Отмена
+                    </button>
+
+                    @if (SelectedOperatorId.HasValue)
+                    {
+                        <button type="button"
+                                class="btn btn-primary"
+                                @onclick="ConfirmAsync">
+                            Выбрать
+                        </button>
+                    }
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<Operator> Operators { get; set; } = [];
+
+    [Parameter]
+    public Guid? SelectedOperatorId { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    private string searchText = string.Empty;
+
+    private bool previousVisible;
+
+    private IEnumerable<Operator> FilteredOperators =>
+        string.IsNullOrWhiteSpace(searchText)
+            ? Operators
+            : Operators.Where(x =>
+                x.FullName.Contains(
+                    searchText,
+                    StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !previousVisible)
+        {
+            searchText = string.Empty;
+        }
+
+        previousVisible = Visible;
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        await OnSelected.InvokeAsync(id);
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!SelectedOperatorId.HasValue)
+            return;
+
+        await OnSelected.InvokeAsync(
+            SelectedOperatorId.Value);
+    }
+
+    private async Task CloseAsync()
+    {
+        searchText = string.Empty;
+
+        await OnClosed.InvokeAsync();
+    }
+}

@@ -1,0 +1,218 @@
+﻿@using FuelControl.Domain.Entities
+@if (Visible)
+{
+    <div class="modal fade show d-block operator-select-modal"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Выбор техники
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseAsync">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <input type="search"
+                               class="form-control"
+                               placeholder="Поиск техники..."
+                               @bind="_searchText"
+                               @bind:event="oninput"
+                               autofocus />
+                    </div>
+
+                    <div class="table-responsive border rounded"
+                         style="max-height: 450px; overflow-y: auto;">
+
+                        <table class="table table-hover align-middle mb-0">
+
+                            <thead class="table-light"
+                                   style="position: sticky; top: 0; z-index: 1;">
+
+                                <tr>
+
+                                    <th style="width: 35px;"></th>
+
+                                    <th style="width: 35%;">
+                                        Техника
+                                    </th>
+
+                                    <th style="width: 20%;">
+                                        Госномер
+                                    </th>
+
+                                    <th style="width: 20%;">
+                                        OmnicommId
+                                    </th>
+
+                                    <th style="width: 25%;">
+                                        Филиал
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                @foreach (var vehicle in FilteredVehicles)
+                                {
+                                    <tr class="@(SelectedVehicleId == vehicle.Id
+                                                                                               ? "table-primary"
+                                                                                               : "")"
+                                        style="cursor: pointer;"
+                                        @onclick="() => SelectAsync(vehicle.Id)">
+
+                                        <td>
+
+                                            @if (SelectedVehicleId == vehicle.Id)
+                                            {
+                                                <span class="bi bi-check-circle-fill text-primary">
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="bi bi-circle text-muted">
+                                                </span>
+                                            }
+
+                                        </td>
+
+                                        <td>
+                                            <div class="fw-semibold">
+                                                @vehicle.Name
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            @(string.IsNullOrWhiteSpace(
+                                                vehicle.RegistrationNumber)
+                                                ? "—"
+                                                : vehicle.RegistrationNumber)
+                                        </td>
+
+                                        <td>
+                                            @(vehicle.OmnicommObjectId?.ToString() ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(vehicle.Branch?.Name ?? "—")
+                                        </td>
+
+                                    </tr>
+                                }
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+                    @if (!FilteredVehicles.Any())
+                    {
+                        <div class="text-center text-muted py-4">
+                            Техника не найдена.
+                        </div>
+                    }
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseAsync">
+                        Отмена
+                    </button>
+
+                    @if (SelectedVehicleId.HasValue)
+                    {
+                        <button type="button"
+                                class="btn btn-primary"
+                                @onclick="ConfirmAsync">
+                            Выбрать
+                        </button>
+                    }
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<Vehicle> Vehicles { get; set; } = [];
+
+    [Parameter]
+    public Guid? SelectedVehicleId { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    private bool _previousVisible;
+
+    private string _searchText = string.Empty;
+
+    private IEnumerable<Vehicle> FilteredVehicles =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? Vehicles
+            : Vehicles.Where(x =>
+                x.Name.Contains(
+                    _searchText,
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                x.OmnicommObjectId?.ToString().Contains(
+                    _searchText,
+                    StringComparison.OrdinalIgnoreCase) == true);
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !_previousVisible)
+        {
+            _searchText = string.Empty;
+        }
+
+        _previousVisible = Visible;
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        await OnSelected.InvokeAsync(id);
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!SelectedVehicleId.HasValue)
+            return;
+
+        await OnSelected.InvokeAsync(
+            SelectedVehicleId.Value);
+    }
+
+    private async Task CloseAsync()
+    {
+        _searchText = string.Empty;
+
+        await OnClosed.InvokeAsync();
+    }
+}

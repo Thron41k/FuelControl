@@ -1,0 +1,13 @@
+﻿.fueling-record-modal {
+    z-index: 1050;
+}
+
+.vehicle-select-modal,
+.operator-select-modal {
+    z-index: 1060;
+}
+
+    .vehicle-select-modal .modal-dialog,
+    .operator-select-modal .modal-dialog {
+        z-index: 1061;
+    }

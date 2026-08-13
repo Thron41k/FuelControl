@@ -10,6 +10,7 @@ public interface IFuelingRecordService
     /// </summary>
     Task<IReadOnlyList<FuelingRecord>> GetAllAsync(
         DateOnly date,
+        TimeZoneInfo timeZone,
         Guid? fuelTruckId = null,
         CancellationToken cancellationToken = default);
 

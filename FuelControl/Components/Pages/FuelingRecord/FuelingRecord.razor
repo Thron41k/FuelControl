@@ -1,38 +1,55 @@
 ﻿@page "/refuels/add"
 @rendermode InteractiveServer
+
+@using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Services.Interfaces
-@using FuelControl.Omnicomm.Reports.Models
 
 @inject IFuelingRecordService FuelingRecordService
-@inject IFuelingUssService FuelingUssService
 @inject IFuelTruckService FuelTruckService
 @inject IVehicleService VehicleService
 @inject IOperatorService OperatorService
+@inject ITimeZoneService TimeZoneService
 
 <PageTitle>Заправки</PageTitle>
 
 <div class="container-fluid">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
         <h3 class="mb-0">
             Заправки
         </h3>
 
-        <button class="btn btn-primary"
-                disabled="@(!CanAdd)"
+        <button type="button"
+                class="btn btn-primary"
+                disabled="@(!CanAddFuelingRecord)"
                 @onclick="OpenCreateDialog">
+
             <i class="bi bi-plus-lg me-1"></i>
+
             Добавить заправку
         </button>
+
     </div>
 
-    <div class="card mb-3">
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+        </div>
+    }
+
+    <!-- Фильтр -->
+
+    <div class="card mb-4">
+
         <div class="card-body">
 
-            <div class="row g-3 align-items-end">
+            <div class="row g-3">
 
-                <div class="col-md-5">
+                <div class="col-md-6">
+
                     <label class="form-label">
                         Топливозаправщик
                     </label>
@@ -41,7 +58,7 @@
                             value="@selectedFuelTruckId"
                             @onchange="OnFuelTruckChanged">
 
-                        <option value="">
+                        <option value="@Guid.Empty">
                             Выберите топливозаправщик
                         </option>
 
@@ -51,10 +68,13 @@
                                 @GetFuelTruckName(fuelTruck)
                             </option>
                         }
+
                     </select>
+
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-6">
+
                     <label class="form-label">
                         Дата
                     </label>
@@ -63,169 +83,205 @@
                            class="form-control"
                            value="@selectedDate.ToString("yyyy-MM-dd")"
                            @onchange="OnDateChanged" />
+
                 </div>
 
             </div>
 
         </div>
+
     </div>
 
-    @if (isLoading)
-    {
-        <div class="text-center py-5">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">
-                    Загрузка...
-                </span>
-            </div>
-        </div>
-    }
-    else if (!CanAdd)
-    {
-        <div class="alert alert-info">
-            Выберите топливозаправщик и дату.
-        </div>
-    }
-    else
-    {
-        <div class="card">
+    <!-- Список заправок -->
 
-            <div class="card-header d-flex justify-content-between">
-                <strong>
-                    Заправки
-                </strong>
+    <div class="card">
 
-                <span class="text-muted">
-                    @selectedDate.ToString("dd.MM.yyyy")
-                </span>
-            </div>
+        <div class="card-body p-0">
 
-            <div class="card-body p-0">
+            @if (isLoading)
+            {
+                <div class="p-4 text-center">
 
-                @if (fuelingRecords.Count == 0)
-                {
-                    <div class="text-center text-muted py-5">
-                        За выбранную дату заправок нет.
+                    <div class="spinner-border"
+                         role="status">
+
+                        <span class="visually-hidden">
+                            Загрузка...
+                        </span>
+
                     </div>
-                }
-                else
-                {
-                    <div class="table-responsive">
 
-                        <table class="table table-hover table-striped mb-0">
+                </div>
+            }
+            else if (selectedFuelTruckId == Guid.Empty)
+            {
+                <div class="p-4 text-center text-muted">
+                    Выберите топливозаправщик.
+                </div>
+            }
+            else if (fuelingRecords.Count == 0)
+            {
+                <div class="p-4 text-center text-muted">
+                    За выбранную дату заправок нет.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
 
-                            <thead>
+                    <table class="table table-hover mb-0">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Время
+                                </th>
+
+                                <th>
+                                    Техника
+                                </th>
+
+                                <th>
+                                    Водитель
+                                </th>
+
+                                <th>
+                                    Начальные показания
+                                </th>
+
+                                <th>
+                                    Конечные показания
+                                </th>
+
+                                <th>
+                                    Объём, л
+                                </th>
+
+                                <th>
+                                    Показания УСС
+                                </th>
+
+                                <th>
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var record in fuelingRecords)
+                            {
                                 <tr>
-                                    <th>Дата / время</th>
-                                    <th>Техника</th>
-                                    <th>Водитель</th>
-                                    <th>Начальные</th>
-                                    <th>Конечные</th>
-                                    <th>Объём, л</th>
-                                    <th>Показания УСС</th>
-                                    <th class="text-end">Действия</th>
+
+                                    <td>
+                                        @FormatLocalDateTime(
+                                            record.FuelingDateTime)
+                                    </td>
+
+                                    <td>
+                                        @record.Vehicle?.Name
+                                    </td>
+
+                                    <td>
+                                        @record.Operator?.FullName
+                                    </td>
+
+                                    <td>
+                                        @record.CounterStart
+                                    </td>
+
+                                    <td>
+                                        @record.CounterEnd
+                                    </td>
+
+                                    <td>
+                                        @record.Volume
+                                    </td>
+
+                                    <td>
+                                        @GetUssDisplayText(record.Id)
+                                    </td>
+
+                                    <td class="text-end">
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary me-1"
+                                                @onclick="() => OpenEditDialog(record)">
+
+                                            <i class="bi bi-pencil"></i>
+
+                                        </button>
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => DeleteAsync(record)">
+
+                                            <i class="bi bi-trash"></i>
+
+                                        </button>
+
+                                    </td>
+
                                 </tr>
-                            </thead>
+                            }
 
-                            <tbody>
+                        </tbody>
 
-                                @foreach (var recordItem in fuelingRecords)
-                                {
-                                    <tr>
+                    </table>
 
-                                        <td>
-                                            recordItem.FuelingDateTime.ToLocalTime()
-                                            .ToString("dd.MM.yyyy HH:mm")
-                                        </td>
-
-                                        <td>
-                                            recordItem.Vehicle.Name
-                                        </td>
-
-                                        <td>
-                                            recordItem.Operator.FullName
-                                        </td>
-
-                                        <td>
-                                            recordItem.CounterStart
-                                        </td>
-
-                                        <td>
-                                            recordItem.CounterEnd
-                                        </td>
-
-                                        <td>
-                                            recordItem.Volume
-                                        </td>
-
-                                        <td>
-                                            @if (recordItem.UssRecords.Count == 0)
-                                            {
-                                                <span class="text-muted">
-                                                    Нет
-                                                </span>
-                                            }
-                                            else
-                                            {
-                                                <span>
-                                                recordItem.UssRecords
-                                                    .Sum(x => x.VolumeLiters)
-                                                    .ToString("N1") л
-                                                </span>
-
-                                                <span class="text-muted ms-1">
-                                                (recordItem.UssRecords.Count)
-                                                </span>
-                                            }
-                                        </td>
-
-                                        <td class="text-end">
-
-                                            <button class="btn btn-sm btn-outline-primary me-1"
-                                                    @onclick="() => OpenEditDialog(recordItem)">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-
-                                            <button class="btn btn-sm btn-outline-danger"
-                                                    @onclick="() => DeleteAsync(recordItem)">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-
-                                        </td>
-
-                                    </tr>
-                                }
-
-                            </tbody>
-
-                        </table>
-
-                    </div>
-                }
-
-            </div>
+                </div>
+            }
 
         </div>
-    }
+
+    </div>
 
 </div>
 
+
+<!-- Диалог выбора техники -->
+
+<VehicleSelectDialog
+    Visible="@showVehicleDialog"
+    Vehicles="@vehicles"
+    SelectedVehicleId="@dialogVehicleId"
+    OnSelected="@OnVehicleSelected"
+    OnClosed="@CloseVehicleDialog" />
+
+
+<!-- Диалог выбора водителя -->
+
+<OperatorSelectDialog
+    Visible="@showOperatorDialog"
+    Operators="@operators"
+    SelectedOperatorId="@dialogOperatorId"
+    OnSelected="@OnOperatorSelected"
+    OnClosed="@CloseOperatorDialog" />
+
+
+<!-- Диалог добавления / редактирования -->
+
 @if (showDialog)
 {
-    <div class="modal fade show d-block"
+    <div class="modal fade show d-block fueling-record-modal"
          tabindex="-1"
          style="background-color: rgba(0,0,0,.5);">
 
-        <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
 
             <div class="modal-content">
 
                 <div class="modal-header">
 
                     <h5 class="modal-title">
+
                         @(editingRecord is null
                             ? "Добавление заправки"
                             : "Редактирование заправки")
+
                     </h5>
 
                     <button type="button"
@@ -239,19 +295,9 @@
 
                     <div class="row g-3">
 
-                        <div class="col-md-4">
+                        <!-- Дата -->
 
-                            <label class="form-label">
-                                Топливозаправщик
-                            </label>
-
-                            <input class="form-control"
-                                   value="@GetSelectedFuelTruckName()"
-                                   disabled />
-
-                        </div>
-
-                        <div class="col-md-4">
+                        <div class="col-md-6">
 
                             <label class="form-label">
                                 Дата
@@ -263,7 +309,10 @@
 
                         </div>
 
-                        <div class="col-md-4">
+
+                        <!-- Время -->
+
+                        <div class="col-md-6">
 
                             <label class="form-label">
                                 Время
@@ -275,53 +324,64 @@
 
                         </div>
 
-                        <div class="col-md-6">
+
+                        <!-- Техника -->
+
+                        <div class="col-md-12">
 
                             <label class="form-label">
                                 Техника
                             </label>
 
-                            <select class="form-select"
-                                    @bind="dialogVehicleId">
+                            <div class="input-group">
 
-                                <option value="">
-                                    Выберите технику
-                                </option>
+                                <input class="form-control"
+                                       readonly
+                                       value="@GetSelectedVehicleName()"
+                                       placeholder="Техника не выбрана" />
 
-                                @foreach (var vehicle in vehicles)
-                                {
-                                    <option value="@vehicle.Id">
-                                        @vehicle.Name
-                                    </option>
-                                }
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        @onclick="OpenVehicleDialog">
 
-                            </select>
+                                    Выбрать
+
+                                </button>
+
+                            </div>
 
                         </div>
 
-                        <div class="col-md-6">
+
+                        <!-- Водитель -->
+
+                        <div class="col-md-12">
 
                             <label class="form-label">
                                 Водитель
                             </label>
 
-                            <select class="form-select"
-                                    @bind="dialogOperatorId">
+                            <div class="input-group">
 
-                                <option value="">
-                                    Выберите водителя
-                                </option>
+                                <input class="form-control"
+                                       readonly
+                                       value="@GetSelectedOperatorName()"
+                                       placeholder="Водитель не выбран" />
 
-                                @foreach (var driver in operators)
-                                {
-                                    <option value="@driver.Id">
-                                        @driver.FullName
-                                    </option>
-                                }
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        @onclick="OpenOperatorDialog">
 
-                            </select>
+                                    Выбрать
+
+                                </button>
+
+                            </div>
 
                         </div>
+
+
+                        <!-- Счётчик -->
 
                         <div class="col-md-4">
 
@@ -336,6 +396,7 @@
 
                         </div>
 
+
                         <div class="col-md-4">
 
                             <label class="form-label">
@@ -348,6 +409,7 @@
                                    @bind="dialogCounterEnd" />
 
                         </div>
+
 
                         <div class="col-md-4">
 
@@ -362,98 +424,57 @@
 
                         </div>
 
-                    </div>
 
-                    <hr />
+                        <!-- УСС -->
 
-                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="col-md-12">
 
-                        <div>
-                            <strong>
+                            <label class="form-label">
                                 Показания УСС
-                            </strong>
+                            </label>
 
-                            @if (selectedUssEvents.Count > 0)
-                            {
-                                <span class="text-muted ms-2">
-                                    выбрано: @selectedUssEvents.Count
-                                </span>
-                            }
+                            <div class="input-group">
+
+                                <input class="form-control"
+                                       readonly
+                                       value="@GetUssSelectionText()"
+                                       placeholder="Показания УСС не выбраны" />
+
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        disabled="@(!CanSelectUss)"
+                                        @onclick="OpenUssDialog">
+
+                                    Выбрать показания УСС
+
+                                </button>
+
+                            </div>
+
                         </div>
-
-                        <button class="btn btn-outline-primary"
-                                @onclick="OpenUssDialog"
-                                disabled="@(!CanSelectUss)">
-                            <i class="bi bi-list-check me-1"></i>
-                            Выбрать показания УСС
-                        </button>
 
                     </div>
-
-                    @if (selectedUssEvents.Count > 0)
-                    {
-                        <div class="mt-3">
-
-                            <table class="table table-sm table-bordered">
-
-                                <thead>
-                                    <tr>
-                                        <th>Событие</th>
-                                        <th>Начало</th>
-                                        <th>Окончание</th>
-                                        <th>Объём, л</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-
-                                    @foreach (var item in selectedUssEvents)
-                                    {
-                                        <tr>
-                                            <td>
-                                                @item.Name
-                                            </td>
-
-                                            <td>
-                                                @item.StartDate
-                                                .ToLocalTime()
-                                                .ToString("HH:mm:ss")
-                                            </td>
-
-                                            <td>
-                                                @item.EndDate
-                                                .ToLocalTime()
-                                                .ToString("HH:mm:ss")
-                                            </td>
-
-                                            <td>
-                                                @item.VolumeLiters.ToString("N1")
-                                            </td>
-                                        </tr>
-                                    }
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-                    }
 
                 </div>
+
 
                 <div class="modal-footer">
 
                     <button type="button"
                             class="btn btn-secondary"
                             @onclick="CloseDialog">
+
                         Отмена
+
                     </button>
 
                     <button type="button"
                             class="btn btn-primary"
                             disabled="@(!CanSave)"
                             @onclick="SaveAsync">
+
                         Сохранить
+
                     </button>
 
                 </div>
@@ -465,207 +486,96 @@
     </div>
 }
 
-@if (showUssDialog)
-{
-    <div class="modal fade show d-block"
-         tabindex="-1"
-         style="background-color: rgba(0,0,0,.5);">
 
-        <div class="modal-dialog modal-xl modal-dialog-centered">
-
-            <div class="modal-content">
-
-                <div class="modal-header">
-
-                    <h5 class="modal-title">
-                        Выбор показаний УСС
-                    </h5>
-
-                    <button type="button"
-                            class="btn-close"
-                            @onclick="CloseUssDialog">
-                    </button>
-
-                </div>
-
-                <div class="modal-body">
-
-                    @if (ussLoading)
-                    {
-                        <div class="text-center py-5">
-                            <div class="spinner-border"></div>
-                        </div>
-                    }
-                    else if (ussEvents.Count == 0)
-                    {
-                        <div class="alert alert-info">
-                            За выбранную дату показаний УСС не найдено.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-
-                            <table class="table table-hover">
-
-                                <thead>
-                                    <tr>
-                                        <th style="width: 50px;"></th>
-                                        <th>Название</th>
-                                        <th>Начало</th>
-                                        <th>Окончание</th>
-                                        <th>Объём, л</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-
-                                    @foreach (var ussEvent in ussEvents)
-                                    {
-                                        <tr @ondblclick="() => ToggleUssEvent(ussEvent)">
-
-                                            <td>
-                                                <input type="checkbox"
-                                                       class="form-check-input"
-                                                       checked="@IsUssSelected(ussEvent)"
-                                                       @onchange="() => ToggleUssEvent(ussEvent)" />
-                                            </td>
-
-                                            <td>
-                                                @ussEvent.Name
-                                            </td>
-
-                                            <td>
-                                                @ussEvent.StartDate
-                                                .ToLocalTime()
-                                                .ToString("HH:mm:ss")
-                                            </td>
-
-                                            <td>
-                                                @ussEvent.EndDate
-                                                .ToLocalTime()
-                                                .ToString("HH:mm:ss")
-                                            </td>
-
-                                            <td>
-                                                @ussEvent.VolumeLiters
-                                                .ToString("N1")
-                                            </td>
-
-                                        </tr>
-                                    }
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-                    }
-
-                </div>
-
-                <div class="modal-footer">
-
-                    <span class="me-auto">
-                        Выбрано: <strong>@selectedUssEvents.Count</strong>
-                    </span>
-
-                    <button class="btn btn-secondary"
-                            @onclick="CloseUssDialog">
-                        Отмена
-                    </button>
-
-                    <button class="btn btn-primary"
-                            @onclick="ConfirmUssSelection">
-                        Выбрать
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-}
 @code {
 
-    private List<FuelTruck> fuelTrucks = [];
-    private List<Vehicle> vehicles = [];
-    private List<Operator> operators = [];
+    private readonly List<FuelTruck> fuelTrucks = [];
+    private readonly List<Vehicle> vehicles = [];
+    private readonly List<Operator> operators = [];
 
     private List<FuelControl.Domain.Entities.FuelingRecord> fuelingRecords = [];
 
-    private List<OmnicommDeliveryEvent> ussEvents = [];
-    private List<OmnicommDeliveryEvent> selectedUssEvents = [];
-
-    private Guid? selectedFuelTruckId;
+    private Guid selectedFuelTruckId = Guid.Empty;
 
     private DateOnly selectedDate =
-        DateOnly.FromDateTime(DateTime.Today);
+        DateOnly.FromDateTime(DateTime.Now);
 
     private bool isLoading;
 
+    private string? errorMessage;
+
     private bool showDialog;
-    private bool showUssDialog;
-    private bool ussLoading;
+    private bool showVehicleDialog;
+    private bool showOperatorDialog;
 
     private FuelControl.Domain.Entities.FuelingRecord? editingRecord;
 
     private DateOnly dialogDate;
+
     private TimeOnly dialogTime;
 
     private Guid? dialogVehicleId;
+
     private Guid? dialogOperatorId;
 
     private int dialogCounterStart;
+
     private int dialogCounterEnd;
+
     private int dialogVolume;
 
-    private bool CanAdd =>
-        selectedFuelTruckId.HasValue;
+    private List<FuelingUssRecord> selectedUssRecords = [];
+
+
+    private bool CanAddFuelingRecord =>
+        selectedFuelTruckId != Guid.Empty;
+
 
     private bool CanSelectUss =>
-        selectedFuelTruckId.HasValue;
+        selectedFuelTruckId != Guid.Empty;
+
 
     private bool CanSave =>
-        selectedFuelTruckId.HasValue &&
-        dialogVehicleId.HasValue &&
-        dialogOperatorId.HasValue &&
-        dialogVolume > 0 &&
-        dialogCounterStart >= 0 &&
-        dialogCounterEnd >= dialogCounterStart;
+        selectedFuelTruckId != Guid.Empty
+        && dialogVehicleId.HasValue
+        && dialogOperatorId.HasValue
+        && dialogVolume > 0
+        && dialogCounterStart >= 0
+        && dialogCounterEnd >= dialogCounterStart;
+
 
     protected override async Task OnInitializedAsync()
     {
         await LoadReferenceDataAsync();
     }
 
+
     private async Task LoadReferenceDataAsync()
     {
-        isLoading = true;
+        fuelTrucks.Clear();
 
-        try
-        {
-            fuelTrucks = (await FuelTruckService.GetAllAsync())
-                .ToList();
+        fuelTrucks.AddRange(
+            await FuelTruckService.GetAllAsync());
 
-            vehicles = (await VehicleService.GetAllAsync())
-                .ToList();
 
-            operators = (await OperatorService.GetAllAsync())
-                .Where(x => x.IsActive)
-                .ToList();
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        vehicles.Clear();
+
+        vehicles.AddRange(
+            await VehicleService.GetAllAsync());
+
+
+        operators.Clear();
+
+        operators.AddRange(
+            await OperatorService.GetAllAsync());
     }
+
 
     private async Task OnFuelTruckChanged(
         ChangeEventArgs args)
     {
+        errorMessage = null;
+
         if (Guid.TryParse(
                 args.Value?.ToString(),
                 out var id))
@@ -674,15 +584,18 @@
         }
         else
         {
-            selectedFuelTruckId = null;
+            selectedFuelTruckId = Guid.Empty;
         }
 
         await LoadFuelingRecordsAsync();
     }
 
+
     private async Task OnDateChanged(
         ChangeEventArgs args)
     {
+        errorMessage = null;
+
         if (DateOnly.TryParse(
                 args.Value?.ToString(),
                 out var date))
@@ -693,9 +606,10 @@
         await LoadFuelingRecordsAsync();
     }
 
+
     private async Task LoadFuelingRecordsAsync()
     {
-        if (!selectedFuelTruckId.HasValue)
+        if (selectedFuelTruckId == Guid.Empty)
         {
             fuelingRecords = [];
             return;
@@ -705,11 +619,21 @@
 
         try
         {
+            var timeZone =
+                TimeZoneService.GetCurrentTimeZone();
+
             fuelingRecords = (
                 await FuelingRecordService.GetAllAsync(
                     selectedDate,
-                    selectedFuelTruckId.Value))
+                    timeZone,
+                    selectedFuelTruckId,
+                    CancellationToken.None))
                 .ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            fuelingRecords = [];
         }
         finally
         {
@@ -717,197 +641,299 @@
         }
     }
 
+
     private void OpenCreateDialog()
     {
+        if (selectedFuelTruckId == Guid.Empty)
+        {
+            errorMessage =
+                "Сначала выберите топливозаправщик.";
+
+            return;
+        }
+
+        errorMessage = null;
+
         editingRecord = null;
 
         dialogDate = selectedDate;
 
-        dialogTime = TimeOnly.FromDateTime(
-            DateTime.Now);
+        dialogTime =
+            TimeOnly.FromDateTime(DateTime.Now);
 
         dialogVehicleId = null;
+
         dialogOperatorId = null;
 
         dialogCounterStart = 0;
+
         dialogCounterEnd = 0;
+
         dialogVolume = 0;
 
-        selectedUssEvents = [];
+        selectedUssRecords = [];
 
         showDialog = true;
     }
+
 
     private void OpenEditDialog(
         FuelControl.Domain.Entities.FuelingRecord record)
     {
         editingRecord = record;
 
-        dialogDate = DateOnly.FromDateTime(
-            record.FuelingDateTime.DateTime);
+        var localDateTime =
+            TimeZoneService.ToLocal(
+                record.FuelingDateTime);
 
-        dialogTime = TimeOnly.FromDateTime(
-            record.FuelingDateTime.DateTime);
+        dialogDate =
+            DateOnly.FromDateTime(
+                localDateTime.DateTime);
 
-        dialogVehicleId = record.VehicleId;
-        dialogOperatorId = record.OperatorId;
+        dialogTime =
+            TimeOnly.FromDateTime(
+                localDateTime.DateTime);
 
-        dialogCounterStart = record.CounterStart;
-        dialogCounterEnd = record.CounterEnd;
-        dialogVolume = record.Volume;
+        dialogVehicleId =
+            record.VehicleId;
 
-        selectedUssEvents = record.UssRecords
-            .Select(x => new OmnicommDeliveryEvent
-            {
-                Id = x.OmnicommEventId,
-                VehicleId = x.OmnicommFuelTruckId,
-                Name = x.Name,
-                StartDate = x.StartDate,
-                EndDate = x.EndDate,
-                VolumeLiters = x.VolumeLiters
-            })
-            .ToList();
+        dialogOperatorId =
+            record.OperatorId;
+
+        dialogCounterStart =
+            record.CounterStart;
+
+        dialogCounterEnd =
+            record.CounterEnd;
+
+        dialogVolume =
+            record.Volume;
+
+        selectedUssRecords = [];
 
         showDialog = true;
     }
 
+
     private void CloseDialog()
     {
         showDialog = false;
+
+        editingRecord = null;
+
+        showVehicleDialog = false;
+
+        showOperatorDialog = false;
     }
 
-    private async Task SaveAsync()
+
+    private void OpenVehicleDialog()
     {
-        if (!CanSave ||
-            !selectedFuelTruckId.HasValue ||
-            !dialogVehicleId.HasValue ||
-            !dialogOperatorId.HasValue)
-        {
-            return;
-        }
-
-        var dateTime = dialogDate.ToDateTime(
-            dialogTime,
-            DateTimeKind.Unspecified);
-
-        var fuelingDateTime = new DateTimeOffset(
-            dateTime,
-            TimeZoneInfo.Local.GetUtcOffset(dateTime));
-
-        if (editingRecord is null)
-        {
-            await FuelingRecordService.CreateAsync(
-                selectedFuelTruckId.Value,
-                dialogVehicleId.Value,
-                dialogOperatorId.Value,
-                fuelingDateTime,
-                dialogVolume,
-                dialogCounterStart,
-                dialogCounterEnd);
-        }
-        else
-        {
-            await FuelingRecordService.UpdateAsync(
-                editingRecord.Id,
-                selectedFuelTruckId.Value,
-                dialogVehicleId.Value,
-                dialogOperatorId.Value,
-                fuelingDateTime,
-                dialogVolume,
-                dialogCounterStart,
-                dialogCounterEnd);
-        }
-
-        showDialog = false;
-
-        await LoadFuelingRecordsAsync();
+        showVehicleDialog = true;
     }
 
-    private async Task DeleteAsync(
-        FuelControl.Domain.Entities.FuelingRecord record)
+
+    private void CloseVehicleDialog()
     {
-        await FuelingRecordService.DeleteAsync(
-            record.Id);
-
-        await LoadFuelingRecordsAsync();
+        showVehicleDialog = false;
     }
 
-    private async Task OpenUssDialog()
+
+    private Task OnVehicleSelected(
+        Guid vehicleId)
     {
-        if (!selectedFuelTruckId.HasValue)
-        {
-            return;
-        }
+        dialogVehicleId = vehicleId;
 
-        ussLoading = true;
-        showUssDialog = true;
+        showVehicleDialog = false;
 
-        try
-        {
-            ussEvents = (
-                await FuelingUssService.GetAvailableEventsAsync(
-                    selectedFuelTruckId.Value,
-                    dialogDate))
-                .ToList();
-        }
-        finally
-        {
-            ussLoading = false;
-        }
+        return Task.CompletedTask;
     }
 
-    private void CloseUssDialog()
+
+    private void OpenOperatorDialog()
     {
-        showUssDialog = false;
+        showOperatorDialog = true;
     }
 
-    private void ToggleUssEvent(
-        OmnicommDeliveryEvent ussEvent)
+
+    private void CloseOperatorDialog()
     {
-        var existing = selectedUssEvents
-            .FirstOrDefault(x => x.Id == ussEvent.Id);
-
-        if (existing is not null)
-        {
-            selectedUssEvents.Remove(existing);
-        }
-        else
-        {
-            selectedUssEvents.Add(ussEvent);
-        }
+        showOperatorDialog = false;
     }
 
-    private bool IsUssSelected(
-        OmnicommDeliveryEvent ussEvent)
+
+    private Task OnOperatorSelected(
+        Guid operatorId)
     {
-        return selectedUssEvents.Any(
-            x => x.Id == ussEvent.Id);
+        dialogOperatorId = operatorId;
+
+        showOperatorDialog = false;
+
+        return Task.CompletedTask;
     }
 
-    private void ConfirmUssSelection()
+
+    private string GetSelectedVehicleName()
     {
-        showUssDialog = false;
+        if (!dialogVehicleId.HasValue)
+            return string.Empty;
+
+        return vehicles
+            .FirstOrDefault(
+                x => x.Id == dialogVehicleId.Value)
+            ?.Name
+            ?? string.Empty;
     }
+
+
+    private string GetSelectedOperatorName()
+    {
+        if (!dialogOperatorId.HasValue)
+            return string.Empty;
+
+        return operators
+            .FirstOrDefault(
+                x => x.Id == dialogOperatorId.Value)
+            ?.FullName
+            ?? string.Empty;
+    }
+
 
     private string GetFuelTruckName(
         FuelTruck fuelTruck)
     {
         return fuelTruck.Vehicle?.Name
-            ?? fuelTruck.Id.ToString();
+            ?? "Неизвестный топливозаправщик";
     }
 
-    private string GetSelectedFuelTruckName()
+
+    private string FormatLocalDateTime(
+        DateTimeOffset utcDateTime)
     {
-        if (!selectedFuelTruckId.HasValue)
-        {
+        return TimeZoneService
+            .ToLocal(utcDateTime)
+            .ToString("HH:mm");
+    }
+
+
+    private string GetUssDisplayText(
+        Guid fuelingRecordId)
+    {
+        return "—";
+    }
+
+
+    private string GetUssSelectionText()
+    {
+        if (selectedUssRecords.Count == 0)
             return string.Empty;
+
+        if (selectedUssRecords.Count == 1)
+        {
+            var record =
+                selectedUssRecords[0];
+
+            return
+                $"{record.StartDate:HH:mm:ss} - " +
+                $"{record.EndDate:HH:mm:ss}, " +
+                $"{record.VolumeLiters:N1} л";
         }
 
-        var fuelTruck = fuelTrucks.FirstOrDefault(
-            x => x.Id == selectedFuelTruckId.Value);
+        return
+            $"Выбрано записей: " +
+            $"{selectedUssRecords.Count}";
+    }
 
-        return fuelTruck is null
-            ? string.Empty
-            : GetFuelTruckName(fuelTruck);
+
+    private void OpenUssDialog()
+    {
+        // Реализуем после подключения
+        // UssSelectDialog.
+    }
+
+
+    private async Task SaveAsync()
+    {
+        if (!CanSave)
+            return;
+
+        errorMessage = null;
+
+        try
+        {
+            var localDateTime =
+                dialogDate.ToDateTime(
+                    dialogTime);
+
+            var timeZone =
+                TimeZoneService.GetCurrentTimeZone();
+
+            var offset =
+                timeZone.GetUtcOffset(
+                    localDateTime);
+
+            var localDateTimeOffset =
+                new DateTimeOffset(
+                    localDateTime,
+                    offset);
+
+            var fuelingDateTime =
+                localDateTimeOffset.ToUniversalTime();
+
+
+            if (editingRecord is null)
+            {
+                await FuelingRecordService.CreateAsync(
+                    selectedFuelTruckId,
+                    dialogVehicleId!.Value,
+                    dialogOperatorId!.Value,
+                    fuelingDateTime,
+                    dialogVolume,
+                    dialogCounterStart,
+                    dialogCounterEnd,
+                    CancellationToken.None);
+            }
+            else
+            {
+                await FuelingRecordService.UpdateAsync(
+                    editingRecord.Id,
+                    selectedFuelTruckId,
+                    dialogVehicleId!.Value,
+                    dialogOperatorId!.Value,
+                    fuelingDateTime,
+                    dialogVolume,
+                    dialogCounterStart,
+                    dialogCounterEnd,
+                    CancellationToken.None);
+            }
+
+            showDialog = false;
+
+            await LoadFuelingRecordsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+
+    private async Task DeleteAsync(
+        FuelControl.Domain.Entities.FuelingRecord record)
+    {
+        errorMessage = null;
+
+        try
+        {
+            await FuelingRecordService.DeleteAsync(
+                record.Id,
+                CancellationToken.None);
+
+            await LoadFuelingRecordsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
     }
 }
