@@ -1,0 +1,279 @@
+﻿@using FuelControl.Omnicomm.Reports.Models
+
+@if (Visible)
+{
+    <div class="modal fade show d-block uss-select-modal"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5); z-index: 1060;">
+
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Выбор показаний УСС
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="Close">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- Поиск -->
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Поиск
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Введите название или объём..."
+                               @bind="searchText"
+                               @bind:event="oninput" />
+
+                    </div>
+
+                    @if (!FilteredEvents.Any())
+                    {
+                        <div class="text-center text-muted py-5">
+                            Показаний УСС за выбранную дату не найдено.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+
+                            <table class="table table-hover align-middle mb-0">
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th style="width: 50px;">
+                                        </th>
+
+                                        <th>
+                                            Начало
+                                        </th>
+
+                                        <th>
+                                            Конец
+                                        </th>
+
+                                        <th>
+                                            Название
+                                        </th>
+
+                                        <th>
+                                            Объём, л
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var item in FilteredEvents)
+                                    {
+                                        var isSelected =
+                                            selectedIds.Contains(item.Id);
+
+                                        <tr class="@(isSelected ? "table-primary" : "")"
+                                            style="cursor: pointer;"
+                                            @ondblclick="() => SelectByDoubleClick(item)">
+
+                                            <td>
+
+                                                <input type="checkbox"
+                                                       class="form-check-input"
+                                                       checked="@isSelected"
+                                                       @onclick:stopPropagation="true"
+                                                       @onchange="() => ToggleSelection(item)" />
+
+                                            </td>
+
+                                            <td>
+                                                @item.StartDate.ToLocalTime().ToString("HH:mm:ss")
+                                            </td>
+
+                                            <td>
+                                                @item.EndDate.ToLocalTime().ToString("HH:mm:ss")
+                                            </td>
+
+                                            <td>
+                                                @item.Name
+                                            </td>
+
+                                            <td>
+                                                @item.VolumeLiters.ToString("N1")
+                                            </td>
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    }
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <div class="me-auto text-muted">
+
+                        Выбрано:
+                        <strong>@selectedIds.Count</strong>
+
+                        @if (selectedIds.Count > 0)
+                        {
+                            <span class="ms-3">
+                                Объём:
+                                <strong>@SelectedVolume.ToString("N1") л</strong>
+                            </span>
+                        }
+
+                    </div>
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="Close">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@(selectedIds.Count == 0)"
+                            @onclick="Confirm">
+
+                        <i class="bi bi-check-lg me-1"></i>
+
+                        Выбрать
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<OmnicommDeliveryEvent> Events { get; set; }
+        = [];
+
+    [Parameter]
+    public IReadOnlySet<int> SelectedEventIds { get; set; }
+        = new HashSet<int>();
+
+    [Parameter]
+    public EventCallback<IReadOnlyList<int>> OnSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+
+    private string searchText = string.Empty;
+
+    private HashSet<int> selectedIds = [];
+
+    private decimal SelectedVolume
+    {
+        get
+        {
+            return Events
+                .Where(x => selectedIds.Contains(x.Id))
+                .Sum(x => x.VolumeLiters);
+        }
+    }
+
+    private IEnumerable<OmnicommDeliveryEvent> FilteredEvents
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return Events;
+            }
+
+            var search = searchText.Trim();
+
+            return Events.Where(x =>
+                x.Name.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                x.VolumeLiters
+                    .ToString("N1")
+                    .Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+            );
+        }
+    }
+
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible)
+            return;
+
+        selectedIds =
+            SelectedEventIds.ToHashSet();
+    }
+
+
+    private void ToggleSelection(
+        OmnicommDeliveryEvent item)
+    {
+        if (!selectedIds.Add(item.Id))
+        {
+            selectedIds.Remove(item.Id);
+        }
+    }
+
+
+    private async Task SelectByDoubleClick(
+        OmnicommDeliveryEvent item)
+    {
+        ToggleSelection(item);
+
+        await Confirm();
+    }
+
+
+    private async Task Confirm()
+    {
+        await OnSelected.InvokeAsync(
+            selectedIds.ToList());
+
+        await OnClosed.InvokeAsync();
+    }
+
+
+    private async Task Close()
+    {
+        await OnClosed.InvokeAsync();
+    }
+}

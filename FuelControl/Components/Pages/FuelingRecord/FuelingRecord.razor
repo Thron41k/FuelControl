@@ -4,12 +4,14 @@
 @using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Services.Interfaces
+@using FuelControl.Omnicomm.Reports.Models
 
 @inject IFuelingRecordService FuelingRecordService
 @inject IFuelTruckService FuelTruckService
 @inject IVehicleService VehicleService
 @inject IOperatorService OperatorService
 @inject ITimeZoneService TimeZoneService
+@inject IFuelingUssService FuelingUssService
 
 <PageTitle>Заправки</PageTitle>
 
@@ -254,6 +256,13 @@
     OnSelected="@OnOperatorSelected"
     OnClosed="@CloseOperatorDialog" />
 
+    
+<UssSelectDialog
+    Visible="@showUssDialog"
+    Events="@ussEvents"
+    SelectedEventIds="@selectedUssEventIds"
+    OnSelected="@OnUssSelected"
+    OnClosed="@CloseUssDialog" />
 
 <!-- Диалог добавления / редактирования -->
 
@@ -569,7 +578,11 @@
 
 @code {
     private bool showDeleteDialog;
+    private bool showUssDialog;
 
+    private List<OmnicommDeliveryEvent> ussEvents = [];
+
+    private HashSet<int> selectedUssEventIds = [];
     private FuelControl.Domain.Entities.FuelingRecord? recordToDelete;
     private readonly List<FuelTruck> fuelTrucks = [];
     private readonly List<Vehicle> vehicles = [];
@@ -930,13 +943,46 @@
             $"{selectedUssRecords.Count}";
     }
 
-
-    private void OpenUssDialog()
+    private Task OnUssSelected(
+        IReadOnlyList<int> eventIds)
     {
-        // Реализуем после подключения
-        // UssSelectDialog.
+        selectedUssEventIds = eventIds.ToHashSet();
+
+        showUssDialog = false;
+
+        return Task.CompletedTask;
     }
 
+    private void CloseUssDialog()
+    {
+        showUssDialog = false;
+    }
+
+    private async Task OpenUssDialog()
+    {
+        if (selectedFuelTruckId == Guid.Empty)
+            return;
+
+        errorMessage = null;
+
+        try
+        {
+            ussEvents = (
+                    await FuelingUssService.GetAvailableEventsAsync(
+                        selectedFuelTruckId,
+                        dialogDate,
+                        CancellationToken.None))
+                .ToList();
+
+            selectedUssEventIds = [];
+
+            showUssDialog = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
 
     private async Task SaveAsync()
     {
