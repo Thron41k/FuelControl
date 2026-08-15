@@ -12,6 +12,7 @@
 @inject IOperatorService OperatorService
 @inject ITimeZoneService TimeZoneService
 @inject IFuelingUssService FuelingUssService
+@inject IOmnicommSpeedService OmnicommSpeedService
 
 <PageTitle>Заправки</PageTitle>
 
@@ -260,6 +261,7 @@
 <UssSelectDialog
     Visible="@showUssDialog"
     Events="@ussEvents"
+    SpeedReport="@speedReport"
     SelectedEventIds="@selectedUssEventIds"
     OnSelected="@OnUssSelected"
     OnClosed="@CloseUssDialog" />
@@ -577,6 +579,10 @@
 }
 
 @code {
+    private OmnicommSpeedReport? speedReport;
+
+    private bool isLoadingSpeed;
+
     private bool showDeleteDialog;
     private bool showUssDialog;
 
@@ -627,7 +633,8 @@
 
 
     private bool CanSelectUss =>
-        selectedFuelTruckId != Guid.Empty;
+        selectedFuelTruckId != Guid.Empty
+        && dialogVehicleId.HasValue;
 
 
     private bool CanSave =>
@@ -769,6 +776,8 @@
         selectedUssRecords = [];
 
         showDialog = true;
+        speedReport = null;
+        isLoadingSpeed = false;
     }
 
 
@@ -963,7 +972,14 @@
         if (selectedFuelTruckId == Guid.Empty)
             return;
 
+        if (!dialogVehicleId.HasValue)
+        {
+            errorMessage = "Сначала выберите технику.";
+            return;
+        }
+
         errorMessage = null;
+        speedReport = null;
 
         try
         {
@@ -976,11 +992,49 @@
 
             selectedUssEventIds = [];
 
+            if (ussEvents.Count == 0)
+            {
+                showUssDialog = true;
+                return;
+            }
+
+            var vehicle = vehicles.FirstOrDefault(
+                x => x.Id == dialogVehicleId.Value);
+
+            if (vehicle is null)
+            {
+                errorMessage = "Выбранная техника не найдена.";
+                return;
+            }
+
+            if (!vehicle.OmnicommObjectId.HasValue)
+            {
+                errorMessage =
+                    "У выбранной техники не указан OmnicommObjectId.";
+
+                return;
+            }
+
+            var from = ussEvents.Min(x => x.StartDate);
+            var to = ussEvents.Max(x => x.EndDate);
+
+            isLoadingSpeed = true;
+
+            speedReport = await OmnicommSpeedService.GetSpeedAsync(
+                vehicle.OmnicommObjectId.Value,
+                from,
+                to,
+                CancellationToken.None);
+
             showUssDialog = true;
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingSpeed = false;
         }
     }
 

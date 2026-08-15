@@ -40,6 +40,79 @@
                                @bind:event="oninput" />
 
                     </div>
+                    <!-- Фильтр по скорости -->
+
+                    <div class="card mb-3">
+
+                        <div class="card-body">
+
+                            <div class="row g-3 align-items-end">
+
+                                <div class="col-md-5">
+
+                                    <div class="form-check form-switch">
+
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               id="speedFilterEnabled"
+                                               @bind="speedFilterEnabled" />
+
+                                        <label class="form-check-label"
+                                               for="speedFilterEnabled">
+
+                                            Фильтр по скорости
+
+                                        </label>
+
+                                    </div>
+
+                                </div>
+
+                                <div class="col-md-4">
+
+                                    <label class="form-label">
+                                        Максимальная скорость, км/ч
+                                    </label>
+
+                                    <input type="number"
+                                           class="form-control"
+                                           min="0"
+                                           step="0.1"
+                                           @bind="maxAllowedSpeed"
+                                           disabled="@(!speedFilterEnabled)" />
+
+                                </div>
+
+                                @if (speedFilterEnabled)
+                                {
+                                    <div class="col-md-3">
+
+                                        <div class="text-muted small">
+
+                                            Показания отбираются,
+                                            если скорость на всём интервале
+                                            не превышает заданный предел.
+
+                                        </div>
+
+                                    </div>
+                                }
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                    @if (SpeedReport is null)
+                    {
+                        <div class="alert alert-warning">
+
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+
+                            Данные о скорости недоступны.
+
+                        </div>
+                    }
 
                     @if (!FilteredEvents.Any())
                     {
@@ -75,7 +148,9 @@
                                         <th>
                                             Объём, л
                                         </th>
-
+                                        <th>
+                                            Макс. скорость
+                                        </th>
                                     </tr>
 
                                 </thead>
@@ -116,7 +191,9 @@
                                             <td>
                                                 @item.VolumeLiters.ToString("N1")
                                             </td>
-
+                                            <td>
+                                                @GetMaxSpeedText(item)
+                                            </td>
                                         </tr>
                                     }
 
@@ -184,6 +261,9 @@
         = [];
 
     [Parameter]
+    public OmnicommSpeedReport? SpeedReport { get; set; }
+
+    [Parameter]
     public IReadOnlySet<int> SelectedEventIds { get; set; }
         = new HashSet<int>();
 
@@ -198,6 +278,11 @@
 
     private HashSet<int> selectedIds = [];
 
+    private bool speedFilterEnabled;
+
+    private decimal maxAllowedSpeed = 20m;
+
+
     private decimal SelectedVolume
     {
         get
@@ -208,28 +293,37 @@
         }
     }
 
+
     private IEnumerable<OmnicommDeliveryEvent> FilteredEvents
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(searchText))
+            IEnumerable<OmnicommDeliveryEvent> result = Events;
+
+            // Поиск
+            if (!string.IsNullOrWhiteSpace(searchText))
             {
-                return Events;
-            }
+                var search = searchText.Trim();
 
-            var search = searchText.Trim();
-
-            return Events.Where(x =>
-                x.Name.Contains(
-                    search,
-                    StringComparison.OrdinalIgnoreCase)
-                ||
-                x.VolumeLiters
-                    .ToString("N1")
-                    .Contains(
+                result = result.Where(x =>
+                    x.Name.Contains(
                         search,
                         StringComparison.OrdinalIgnoreCase)
-            );
+                    ||
+                    x.VolumeLiters
+                        .ToString("N1")
+                        .Contains(
+                            search,
+                            StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Фильтр по максимальной скорости
+            if (speedFilterEnabled)
+            {
+                result = result.Where(HasAllowedSpeed);
+            }
+
+            return result;
         }
     }
 
@@ -241,6 +335,61 @@
 
         selectedIds =
             SelectedEventIds.ToHashSet();
+    }
+
+
+    private bool HasAllowedSpeed(
+        OmnicommDeliveryEvent item)
+    {
+        var maxSpeed = GetMaxSpeed(item);
+
+        if (!maxSpeed.HasValue)
+            return false;
+
+        return maxSpeed.Value <= maxAllowedSpeed;
+    }
+
+
+    private decimal? GetMaxSpeed(
+        OmnicommDeliveryEvent item)
+    {
+        if (SpeedReport is null)
+            return null;
+
+        var points = SpeedReport.Points;
+
+        if (points.Count == 0)
+            return null;
+
+        // Omnicomm может отличаться на несколько миллисекунд
+        // между StartDate события delivery и speed report.
+        var intervalStart =
+            item.StartDate.AddSeconds(-1);
+
+        var intervalEnd =
+            item.EndDate.AddSeconds(1);
+
+        var intervalPoints = points
+            .Where(x =>
+                x.Timestamp >= intervalStart &&
+                x.Timestamp <= intervalEnd)
+            .ToList();
+
+        if (intervalPoints.Count == 0)
+            return null;
+
+        return intervalPoints.Max(x => x.SpeedKmh);
+    }
+
+
+    private string GetMaxSpeedText(
+        OmnicommDeliveryEvent item)
+    {
+        var maxSpeed = GetMaxSpeed(item);
+
+        return maxSpeed.HasValue
+            ? $"{maxSpeed.Value:N1} км/ч"
+            : "—";
     }
 
 

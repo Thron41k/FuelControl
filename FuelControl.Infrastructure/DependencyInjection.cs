@@ -98,6 +98,7 @@ public static class DependencyInjection
             FuelTruckService>();
         services.AddScoped<IFuelingUssService, FuelingUssService>();
         services.AddScoped<ITimeZoneService, TimeZoneService>();
+        services.AddScoped<IOmnicommSpeedService, OmnicommSpeedService>();
         return services;
     }
 }

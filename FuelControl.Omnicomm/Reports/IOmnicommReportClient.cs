@@ -17,4 +17,11 @@ public interface IOmnicommReportClient
         DateTimeOffset to,
         string timeZone = "Asia/Chita",
         CancellationToken cancellationToken = default);
+
+    Task<OmnicommSpeedReport> GetSpeedReportAsync(
+        IReadOnlyList<long> vehicleIds,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        string timeZone = "Asia/Chita",
+        CancellationToken cancellationToken = default);
 }

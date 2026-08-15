@@ -12,7 +12,11 @@ public sealed class OmnicommReportClient(
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        Converters =
+        {
+            new OmnicommSpeedPointDtoConverter()
+        }
     };
 
     public async Task<OmnicommDeliveryReport> GetDeliveryReportAsync(
@@ -289,4 +293,154 @@ public sealed class OmnicommReportClient(
             3 => OmnicommFuelEventType.Drain,
             _ => OmnicommFuelEventType.Unknown
         };
+
+    public async Task<OmnicommSpeedReport> GetSpeedReportAsync(
+    IReadOnlyList<long> vehicleIds,
+    DateTimeOffset from,
+    DateTimeOffset to,
+    string timeZone = "Asia/Chita",
+    CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(vehicleIds);
+
+        if (vehicleIds.Count == 0)
+        {
+            throw new ArgumentException(
+                "Необходимо указать хотя бы один vehicleId.",
+                nameof(vehicleIds));
+        }
+
+        if (to <= from)
+        {
+            throw new ArgumentException(
+                "Дата окончания должна быть больше даты начала.");
+        }
+
+        var fromMs = from.ToUnixTimeMilliseconds();
+        var toMs = to.ToUnixTimeMilliseconds();
+
+        var requestBody = new
+        {
+            type = "ASEReport",
+            sync = 1,
+            rebuild = true,
+            tz = timeZone,
+
+            meta = new
+            {
+                report = "speed",
+                vehiclesCount = vehicleIds.Count
+            },
+
+            @params = new
+            {
+                from = fromMs,
+                to = toMs,
+
+                @params = new
+                {
+                    winterOffset = 540,
+                    summerOffset = 540,
+
+                    action = "getReportData",
+                    newui = true,
+
+                    locale = "ru",
+
+                    reportFromdate = fromMs,
+                    fromDatetime = fromMs,
+
+                    reportTodate = toMs,
+                    toDatetime = toMs,
+
+                    selectedRoots = new[]
+                    {
+                    "FTC"
+                },
+
+                    ID = vehicleIds,
+
+                    vehicleID = vehicleIds,
+
+                    tz = timeZone,
+
+                    objectType = new[]
+                    {
+                    "FTC"
+                },
+
+                    objectClass = new[]
+                    {
+                    1
+                },
+
+                    maxPoints = 300
+                },
+
+                url = "speed",
+
+                method = "POST",
+
+                traditional = true
+            }
+        };
+
+        using var response = await apiClient.SendAsync(
+            () =>
+            {
+                var message = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    "/service/reports/");
+
+                message.Content = JsonContent.Create(
+                    requestBody,
+                    options: JsonOptions);
+
+                return message;
+            },
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(
+            cancellationToken);
+
+        var raw = JsonSerializer.Deserialize<OmnicommSpeedReportResponse>(
+            json,
+            JsonOptions);
+
+        if (raw is null)
+        {
+            throw new InvalidOperationException(
+                "Omnicomm вернул пустой ответ отчёта speed.");
+        }
+
+        if (!string.Equals(
+                raw.Status,
+                "SUCCESS",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Omnicomm вернул статус отчёта: {raw.Status}");
+        }
+
+        var points = (raw.Results?.SpeedData ?? [])
+            .Select(point => new OmnicommSpeedPoint
+            {
+                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(
+                    point.Timestamp),
+
+                SpeedKmh = point.Speed
+            })
+            .ToList();
+
+        return new OmnicommSpeedReport
+        {
+            ReportId = raw.Id,
+            Status = raw.Status,
+            MaximalSpeedKmh = raw.Results?.MaximalSpeed ?? 0,
+            Points = points
+        };
+    }
 }
+
