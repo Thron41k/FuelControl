@@ -10,39 +10,42 @@ public sealed class OmnicommSpeedReport
 
     public IReadOnlyList<OmnicommSpeedPoint> Points { get; init; } = [];
 
-    private static readonly TimeSpan MaxSpeedPointAge =
-        TimeSpan.FromMinutes(2);
 
+
+
+    /// <summary>
+    /// Возвращает максимальную скорость внутри интервала события.
+    ///
+    /// Алгоритм:
+    ///
+    /// 1. Берём последнюю точку перед началом события.
+    /// 2. Если она достаточно близко к началу события,
+    ///    используем её как начальное состояние.
+    /// 3. Берём все точки строго внутри [from; to].
+    /// 4. Не расширяем интервал искусственно.
+    /// 5. Точки после to никогда не участвуют.
+    /// </summary>
     public decimal? GetMaxSpeed(
         DateTimeOffset from,
         DateTimeOffset to)
     {
-        var previousPoint = Points
-            .Where(x =>
-                x.Timestamp <= from &&
-                from - x.Timestamp <= MaxSpeedPointAge)
-            .OrderByDescending(x => x.Timestamp)
-            .FirstOrDefault();
+        if (to <= from)
+        {
+            throw new ArgumentException(
+                "Дата окончания должна быть больше даты начала.");
+        }
 
-        var intervalPoints = Points
-            .Where(x =>
-                x.Timestamp > from &&
-                x.Timestamp <= to);
+        const double startToleranceMilliseconds = 1000;
 
-        var speeds = intervalPoints
+        var start = from.AddMilliseconds(
+            -startToleranceMilliseconds);
+
+        return Points
+            .Where(x =>
+                x.Timestamp >= start &&
+                x.Timestamp <= to)
             .Select(x => x.SpeedKmh)
-            .ToList();
-
-        if (previousPoint is not null)
-        {
-            speeds.Add(previousPoint.SpeedKmh);
-        }
-
-        if (speeds.Count == 0)
-        {
-            return null;
-        }
-
-        return speeds.Max();
+            .DefaultIfEmpty()
+            .Max();
     }
 }

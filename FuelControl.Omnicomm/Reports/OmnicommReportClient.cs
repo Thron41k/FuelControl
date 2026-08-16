@@ -427,10 +427,27 @@ public sealed class OmnicommReportClient(
         var points = (raw.Results?.SpeedData ?? [])
             .Select(point => new OmnicommSpeedPoint
             {
-                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(
-                    point.Timestamp),
+                Timestamp =
+                    DateTimeOffset.FromUnixTimeMilliseconds(
+                        point.Timestamp),
 
                 SpeedKmh = point.Speed
+            })
+            .OrderBy(x => x.Timestamp)
+            .GroupBy(x => x.Timestamp)
+            .Select(g => new OmnicommSpeedPoint
+            {
+                Timestamp = g.Key,
+
+                /*
+                 * Если Omnicomm прислал несколько значений
+                 * с одинаковым timestamp, оставляем максимальное.
+                 *
+                 * Это безопаснее для контроля движения:
+                 * если на одном timestamp были разные показания,
+                 * не потеряем потенциальное превышение скорости.
+                 */
+                SpeedKmh = g.Max(x => x.SpeedKmh)
             })
             .ToList();
 

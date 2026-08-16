@@ -337,14 +337,15 @@
             SelectedEventIds.ToHashSet();
     }
 
-
     private bool HasAllowedSpeed(
         OmnicommDeliveryEvent item)
     {
         var maxSpeed = GetMaxSpeed(item);
 
         if (!maxSpeed.HasValue)
+        {
             return false;
+        }
 
         return maxSpeed.Value <= maxAllowedSpeed;
     }
@@ -353,32 +354,9 @@
     private decimal? GetMaxSpeed(
         OmnicommDeliveryEvent item)
     {
-        if (SpeedReport is null)
-            return null;
-
-        var points = SpeedReport.Points;
-
-        if (points.Count == 0)
-            return null;
-
-        // Omnicomm может отличаться на несколько миллисекунд
-        // между StartDate события delivery и speed report.
-        var intervalStart =
-            item.StartDate.AddSeconds(-1);
-
-        var intervalEnd =
-            item.EndDate.AddSeconds(1);
-
-        var intervalPoints = points
-            .Where(x =>
-                x.Timestamp >= intervalStart &&
-                x.Timestamp <= intervalEnd)
-            .ToList();
-
-        if (intervalPoints.Count == 0)
-            return null;
-
-        return intervalPoints.Max(x => x.SpeedKmh);
+        return SpeedReport?.GetMaxSpeed(
+            item.StartDate,
+            item.EndDate);
     }
 
 
@@ -391,7 +369,6 @@
             ? $"{maxSpeed.Value:N1} км/ч"
             : "—";
     }
-
 
     private void ToggleSelection(
         OmnicommDeliveryEvent item)
