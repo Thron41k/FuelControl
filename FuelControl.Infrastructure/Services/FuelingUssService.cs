@@ -16,6 +16,7 @@ public sealed class FuelingUssService(
     public async Task<IReadOnlyList<OmnicommDeliveryEvent>> GetAvailableEventsAsync(
         Guid fuelTruckId,
         DateOnly date,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
         _ = GetCurrentUserId();
@@ -47,6 +48,7 @@ public sealed class FuelingUssService(
             [omnicommId],
             from,
             to,
+            timeZone,
             cancellationToken: cancellationToken);
 
         var events = report.Events
@@ -101,6 +103,7 @@ public sealed class FuelingUssService(
     public async Task AttachAsync(
         Guid fuelingRecordId,
         IReadOnlyList<int> omnicommEventIds,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
         var userId = GetCurrentUserId();
@@ -158,6 +161,7 @@ public sealed class FuelingUssService(
             [omnicommId],
             from,
             to,
+            timeZone,
             cancellationToken: cancellationToken);
 
         var selectedEvents = report.Events

@@ -4,9 +4,9 @@ namespace FuelControl.Infrastructure.Services.Interfaces;
 
 public interface IOmnicommSpeedService
 {
-    Task<OmnicommSpeedReport> GetSpeedAsync(
-        long vehicleId,
+    Task<OmnicommSpeedReport> GetSpeedAsync(long vehicleId,
         DateTimeOffset from,
         DateTimeOffset to,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 }

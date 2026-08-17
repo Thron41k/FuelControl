@@ -13,6 +13,7 @@
 @inject ITimeZoneService TimeZoneService
 @inject IFuelingUssService FuelingUssService
 @inject IOmnicommSpeedService OmnicommSpeedService
+@inject IBrowserTimeZoneService BrowserTimeZoneService
 
 <PageTitle>Заправки</PageTitle>
 
@@ -582,7 +583,7 @@
     private OmnicommSpeedReport? speedReport;
 
     private bool isLoadingSpeed;
-
+    private OmnicommTimeZone? browserTimeZone;
     private bool showDeleteDialog;
     private bool showUssDialog;
 
@@ -983,10 +984,13 @@
 
         try
         {
+            browserTimeZone =
+                await BrowserTimeZoneService.GetAsync();
             ussEvents = (
                     await FuelingUssService.GetAvailableEventsAsync(
                         selectedFuelTruckId,
                         dialogDate,
+                        browserTimeZone,
                         CancellationToken.None))
                 .ToList();
 
@@ -1020,11 +1024,14 @@
 
             isLoadingSpeed = true;
 
-            speedReport = await OmnicommSpeedService.GetSpeedAsync(
-                vehicle.OmnicommObjectId.Value,
-                from,
-                to,
-                CancellationToken.None);
+            var vehicleOmnicommObjectId = fuelTrucks.First(x => x.Id == selectedFuelTruckId).Vehicle.OmnicommObjectId;
+            if (vehicleOmnicommObjectId != null)
+                speedReport = await OmnicommSpeedService.GetSpeedAsync(
+                    vehicleOmnicommObjectId.Value,
+                    from,
+                    to,
+                    browserTimeZone,
+                    CancellationToken.None);
 
             showUssDialog = true;
         }

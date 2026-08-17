@@ -23,10 +23,11 @@ public sealed class OmnicommReportClient(
         IReadOnlyList<long> vehicleIds,
         DateTimeOffset from,
         DateTimeOffset to,
-        string timeZone = "Asia/Chita",
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(vehicleIds);
+        ArgumentNullException.ThrowIfNull(timeZone);
 
         if (vehicleIds.Count == 0)
             throw new ArgumentException(
@@ -48,8 +49,8 @@ public sealed class OmnicommReportClient(
                 to = toMs,
                 @params = new
                 {
-                    winterOffset = 540,
-                    summerOffset = 540,
+                    winterOffset = timeZone.WinterOffset,
+                    summerOffset = timeZone.SummerOffset,
                     page = 1,
                     rows = 500,
                     from = fromMs,
@@ -78,7 +79,7 @@ public sealed class OmnicommReportClient(
                 report = "delivery",
                 vehiclesCount = vehicleIds.Count
             },
-            tz = timeZone,
+            tz = timeZone.TimeZone,
             type = "ASEReport",
             rebuild = true,
             service = false,
@@ -145,7 +146,7 @@ public sealed class OmnicommReportClient(
     IReadOnlyList<long> vehicleIds,
     DateTimeOffset from,
     DateTimeOffset to,
-    string timeZone = "Asia/Chita",
+    OmnicommTimeZone timeZone,
     CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(vehicleIds);
@@ -179,8 +180,8 @@ public sealed class OmnicommReportClient(
                 to = toMs,
                 @params = new
                 {
-                    winterOffset = 540,
-                    summerOffset = 540,
+                    winterOffset = timeZone.WinterOffset,
+                    summerOffset = timeZone.SummerOffset,
                     action = "getReportData",
                     newui = true,
                     locale = "ru",
@@ -191,7 +192,7 @@ public sealed class OmnicommReportClient(
                     selectedRoots = new[] { "FAS" },
                     ID = vehicleIds,
                     vehicleID = vehicleIds,
-                    tz = timeZone,
+                    tz = timeZone.TimeZone,
                     objectType = new[] { "FAS" },
                     objectClass = new[] { 1 },
                     rows = 500,
@@ -298,7 +299,7 @@ public sealed class OmnicommReportClient(
     IReadOnlyList<long> vehicleIds,
     DateTimeOffset from,
     DateTimeOffset to,
-    string timeZone = "Asia/Chita",
+    OmnicommTimeZone timeZone,
     CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(vehicleIds);
@@ -339,8 +340,8 @@ public sealed class OmnicommReportClient(
 
                 @params = new
                 {
-                    winterOffset = 540,
-                    summerOffset = 540,
+                    winterOffset = timeZone.WinterOffset,
+                    summerOffset = timeZone.SummerOffset,
 
                     action = "getReportData",
                     newui = true,
@@ -362,7 +363,7 @@ public sealed class OmnicommReportClient(
 
                     vehicleID = vehicleIds,
 
-                    tz = timeZone,
+                    tz = timeZone.TimeZone,
 
                     objectType = new[]
                     {

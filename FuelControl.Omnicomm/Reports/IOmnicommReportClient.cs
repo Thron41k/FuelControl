@@ -8,20 +8,20 @@ public interface IOmnicommReportClient
         IReadOnlyList<long> vehicleIds,
         DateTimeOffset from,
         DateTimeOffset to,
-        string timeZone = "Asia/Chita",
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 
     Task<OmnicommFuelEventsReport> GetFuelEventsReportAsync(
         IReadOnlyList<long> vehicleIds,
         DateTimeOffset from,
         DateTimeOffset to,
-        string timeZone = "Asia/Chita",
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 
     Task<OmnicommSpeedReport> GetSpeedReportAsync(
         IReadOnlyList<long> vehicleIds,
         DateTimeOffset from,
         DateTimeOffset to,
-        string timeZone = "Asia/Chita",
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 }

@@ -8,10 +8,10 @@ public sealed class OmnicommSpeedService(
     IOmnicommReportClient reportClient)
     : IOmnicommSpeedService
 {
-    public Task<OmnicommSpeedReport> GetSpeedAsync(
-        long vehicleId,
+    public Task<OmnicommSpeedReport> GetSpeedAsync(long vehicleId,
         DateTimeOffset from,
         DateTimeOffset to,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
         if (vehicleId <= 0)
@@ -30,6 +30,7 @@ public sealed class OmnicommSpeedService(
             [vehicleId],
             from,
             to,
+            timeZone,
             cancellationToken: cancellationToken);
     }
 }

@@ -15,6 +15,7 @@ public interface IFuelingUssService
     Task<IReadOnlyList<OmnicommDeliveryEvent>> GetAvailableEventsAsync(
         Guid fuelTruckId,
         DateOnly date,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -34,6 +35,7 @@ public interface IFuelingUssService
     Task AttachAsync(
         Guid fuelingRecordId,
         IReadOnlyList<int> omnicommEventIds,
+        OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -99,6 +99,8 @@ public static class DependencyInjection
         services.AddScoped<IFuelingUssService, FuelingUssService>();
         services.AddScoped<ITimeZoneService, TimeZoneService>();
         services.AddScoped<IOmnicommSpeedService, OmnicommSpeedService>();
+        services.AddScoped<IBrowserTimeZoneService,
+            BrowserTimeZoneService>();
         return services;
     }
 }
