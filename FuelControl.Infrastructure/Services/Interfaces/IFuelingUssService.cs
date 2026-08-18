@@ -35,7 +35,7 @@ public interface IFuelingUssService
     Task AttachAsync(
         Guid fuelingRecordId,
         IReadOnlyList<int> omnicommEventIds,
-        OmnicommTimeZone timeZone,
+        OmnicommTimeZone? timeZone,
         CancellationToken cancellationToken = default);
 
     /// <summary>

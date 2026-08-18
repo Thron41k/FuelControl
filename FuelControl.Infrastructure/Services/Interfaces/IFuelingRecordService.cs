@@ -55,4 +55,11 @@ public interface IFuelingRecordService
     Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FuelingRecord>> GetByPeriodAsync(
+        DateOnly from,
+        DateOnly to,
+        TimeZoneInfo timeZone,
+        Guid? vehicleId = null,
+        CancellationToken cancellationToken = default);
 }

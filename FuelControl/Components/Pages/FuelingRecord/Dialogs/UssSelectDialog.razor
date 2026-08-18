@@ -1,4 +1,5 @@
-﻿@using FuelControl.Omnicomm.Reports.Models
+﻿@using FuelControl.Domain.Entities
+@using FuelControl.Omnicomm.Reports.Models
 
 @if (Visible)
 {
@@ -24,7 +25,33 @@
                 </div>
 
                 <div class="modal-body">
+                    @if (Loading)
+                    {
+                        <div class="d-flex flex-column justify-content-center align-items-center py-5"
+                             style="min-height: 300px;">
 
+                            <div class="spinner-border text-primary mb-3"
+                                 role="status"
+                                 style="width: 3rem; height: 3rem;">
+
+                                <span class="visually-hidden">
+                                    Загрузка...
+                                </span>
+
+                            </div>
+
+                            <div class="fw-semibold">
+                                Загрузка данных из Omnicomm…
+                            </div>
+
+                            <div class="text-muted small mt-1">
+                                Получение показаний УСС и данных о скорости
+                            </div>
+
+                        </div>
+                    }
+                    else
+                    {
                     <!-- Фильтр по скорости -->
 
                     <div class="card mb-3">
@@ -144,20 +171,23 @@
 
                                     @foreach (var item in FilteredEvents)
                                     {
-                                        var isSelected =
-                                            _selectedIds.Contains(item.Id);
-
-                                        <tr class="@(isSelected ? "table-primary" : "")"
-                                            style="cursor: pointer;"
-                                            @ondblclick="() => SelectByDoubleClick(item)">
+                                            var isSelected = IsSelected(item.Id);
+                                            var isAttachedToAnotherFueling =
+                                                IsAttachedToAnotherFueling(item.Id);
+                                            <tr class="
+                                                @(isSelected ? "table-primary" : "")
+                                                @(isAttachedToAnotherFueling ? "table-secondary text-muted" : "")"
+                                                style="cursor: @(isAttachedToAnotherFueling ? "not-allowed" : "pointer");"
+                                                @ondblclick="() => SelectByDoubleClick(item, isAttachedToAnotherFueling)">
 
                                             <td>
 
                                                 <input type="checkbox"
                                                        class="form-check-input"
                                                        checked="@isSelected"
+                                                           disabled="@isAttachedToAnotherFueling"
                                                        @onclick:stopPropagation="true"
-                                                       @onchange="() => ToggleSelection(item)" />
+                                                           @onchange="() => ToggleSelection(item, isAttachedToAnotherFueling)" />
 
                                             </td>
 
@@ -188,28 +218,44 @@
 
                         </div>
                     }
-
+                    }
                 </div>
 
                 <div class="modal-footer">
 
-                    <div class="me-auto text-muted">
-
-                        Выбрано:
-                        <strong>@_selectedIds.Count</strong>
-
-                        @if (_selectedIds.Count > 0)
-                        {
-                            <span class="ms-3">
-                                Объём:
-                                <strong>@SelectedVolume.ToString("N1") л</strong>
+                    @if (Loading)
+                    {
+                        <div class="me-auto text-muted small">
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status">
                             </span>
-                        }
 
-                    </div>
+                            Выполняется загрузка данных…
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="me-auto text-muted">
+
+                            Выбрано:
+                            <strong>@_selectedIds.Count</strong>
+
+                            @if (_selectedIds.Count > 0)
+                            {
+                                <span class="ms-3">
+                                    Объём:
+                                    <strong>
+                                        @SelectedVolume.ToString("0.###") л
+                                    </strong>
+                                </span>
+                            }
+
+                        </div>
+                    }
 
                     <button type="button"
                             class="btn btn-secondary"
+                            disabled="@Loading"
                             @onclick="Close">
 
                         Отмена
@@ -218,13 +264,10 @@
 
                     <button type="button"
                             class="btn btn-primary"
-                            disabled="@(_selectedIds.Count == 0)"
+                            disabled="@Loading"
                             @onclick="Confirm">
-
                         <i class="bi bi-check-lg me-1"></i>
-
                         Выбрать
-
                     </button>
 
                 </div>
@@ -236,13 +279,20 @@
     </div>
 }
 
-@code {
+@code
+{
+    [Parameter]
+    public bool Loading { get; set; }
 
     [Parameter]
     public bool Visible { get; set; }
 
     [Parameter]
     public IReadOnlyList<OmnicommDeliveryEvent> Events { get; set; }
+        = [];
+
+    [Parameter]
+    public IReadOnlyList<FuelingUssRecord> SavedUssRecords { get; set; }
         = [];
 
     [Parameter]
@@ -253,6 +303,9 @@
         = new HashSet<int>();
 
     [Parameter]
+    public IReadOnlySet<int> AttachedEventIds { get; set; }
+        = new HashSet<int>();
+    [Parameter]
     public EventCallback<IReadOnlyList<int>> OnSelected { get; set; }
 
     [Parameter]
@@ -261,19 +314,53 @@
 
     private HashSet<int> _selectedIds = [];
 
+    private bool _selectionInitialized;
+
     private bool _speedFilterEnabled = true;
 
     private decimal _maxAllowedSpeed = 20m;
 
+    private bool IsAttachedToAnotherFueling(int eventId)
+    {
+        return AttachedEventIds.Contains(eventId);
+    }
 
     private decimal SelectedVolume
     {
         get
         {
-            return Events
-                .Where(x => _selectedIds.Contains(x.Id))
-                .Sum(x => x.VolumeLiters);
+            var eventsById = Events
+                .ToDictionary(x => x.Id);
+
+            var savedById = SavedUssRecords
+                .ToDictionary(x => x.OmnicommEventId);
+
+            decimal total = 0;
+
+            foreach (var eventId in _selectedIds)
+            {
+                if (eventsById.TryGetValue(
+                        eventId,
+                        out var omnicommEvent))
+                {
+                    total += omnicommEvent.VolumeLiters;
+                }
+                else if (savedById.TryGetValue(
+                             eventId,
+                             out var savedRecord))
+                {
+                    total += savedRecord.VolumeLiters;
+                }
+            }
+
+            return total;
         }
+    }
+
+
+    private bool IsSelected(int eventId)
+    {
+        return _selectedIds.Contains(eventId);
     }
 
 
@@ -283,7 +370,6 @@
         {
             IEnumerable<OmnicommDeliveryEvent> result = Events;
 
-            // Фильтр по максимальной скорости
             if (_speedFilterEnabled)
             {
                 result = result.Where(HasAllowedSpeed);
@@ -297,11 +383,19 @@
     protected override void OnParametersSet()
     {
         if (!Visible)
+        {
+            _selectionInitialized = false;
             return;
+        }
 
-        _selectedIds =
-            SelectedEventIds.ToHashSet();
+        if (!_selectionInitialized)
+        {
+            _selectedIds = SelectedEventIds.ToHashSet();
+
+            _selectionInitialized = true;
+        }
     }
+
 
     private bool HasAllowedSpeed(
         OmnicommDeliveryEvent item)
@@ -309,9 +403,7 @@
         var maxSpeed = GetMaxSpeed(item);
 
         if (!maxSpeed.HasValue)
-        {
             return false;
-        }
 
         return maxSpeed.Value <= _maxAllowedSpeed;
     }
@@ -336,9 +428,14 @@
             : "—";
     }
 
+
     private void ToggleSelection(
-        OmnicommDeliveryEvent item)
+        OmnicommDeliveryEvent item,
+        bool isAttachedToAnotherFueling)
     {
+        if (isAttachedToAnotherFueling)
+            return;
+
         if (!_selectedIds.Add(item.Id))
         {
             _selectedIds.Remove(item.Id);
@@ -347,9 +444,15 @@
 
 
     private async Task SelectByDoubleClick(
-        OmnicommDeliveryEvent item)
+        OmnicommDeliveryEvent item,
+        bool isAttachedToAnotherFueling)
     {
-        ToggleSelection(item);
+        if (isAttachedToAnotherFueling)
+            return;
+
+        ToggleSelection(
+            item,
+            isAttachedToAnotherFueling);
 
         await Confirm();
     }
@@ -359,8 +462,6 @@
     {
         await OnSelected.InvokeAsync(
             _selectedIds.ToList());
-
-        await OnClosed.InvokeAsync();
     }
 
 

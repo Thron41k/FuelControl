@@ -1,0 +1,345 @@
+﻿@page "/fueling-records"
+
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Services.Interfaces
+
+@inject IFuelingRecordService FuelingRecordService
+@inject IVehicleService VehicleService
+
+<PageTitle>Заправки</PageTitle>
+
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <h3 class="mb-0">
+            Заправки
+        </h3>
+
+    </div>
+
+
+    <!-- Фильтры -->
+
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            <div class="row g-3 align-items-end">
+
+                <!-- Дата начала -->
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        С
+                    </label>
+
+                    <input type="date"
+                           class="form-control"
+                           @bind="_fromDate" />
+
+                </div>
+
+
+                <!-- Дата окончания -->
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        По
+                    </label>
+
+                    <input type="date"
+                           class="form-control"
+                           @bind="_toDate" />
+
+                </div>
+
+
+                <!-- Техника -->
+
+                <div class="col-md-4">
+
+                    <label class="form-label">
+                        Техника
+                    </label>
+
+                    <select class="form-select"
+                            @bind="_selectedVehicleId">
+
+                        <option value="">
+                            Вся техника
+                        </option>
+
+                        @foreach (var vehicle in _vehicles)
+                        {
+                            <option value="@vehicle.Id">
+                                @vehicle.Name
+                            </option>
+                        }
+
+                    </select>
+
+                </div>
+
+
+                <!-- Кнопка -->
+
+                <div class="col-md-2">
+
+                    <button type="button"
+                            class="btn btn-primary w-100"
+                            disabled="@_loading"
+                            @onclick="LoadRecords">
+
+                        @if (_loading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2">
+                            </span>
+                        }
+
+                        Показать
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Ошибка -->
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+
+
+    <!-- Загрузка -->
+    @if (_loading)
+    {
+        <div class="text-center py-5">
+
+            <div class="spinner-border text-primary"
+                 style="width: 3rem; height: 3rem;">
+            </div>
+
+            <div class="mt-3 text-muted">
+                Загрузка заправок...
+            </div>
+
+        </div>
+    }
+    else if (_loaded)
+    {
+        @if (_records.Count == 0)
+        {
+            <div class="alert alert-info">
+                Заправок за выбранный период не найдено.
+            </div>
+        }
+        else
+        {
+            <div class="card">
+
+                <div class="card-body p-0">
+
+                    <div class="table-responsive">
+
+                        <table class="table table-hover align-middle mb-0">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        Дата
+                                    </th>
+
+                                    <th>
+                                        Техника
+                                    </th>
+
+                                    <th>
+                                        Водитель
+                                    </th>
+
+                                    <th>
+                                        Топливозаправщик
+                                    </th>
+
+                                    <th>
+                                        Объём, л
+                                    </th>
+
+                                    <th>
+                                        Счётчик
+                                    </th>
+
+                                    <th>
+                                        УСС
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                @foreach (var record in _records)
+                                {
+                                    <tr>
+
+                                        <td>
+                                            @record.FuelingDateTime
+                                            .ToLocalTime()
+                                            .ToString("dd.MM.yyyy HH:mm")
+                                        </td>
+
+                                        <td>
+                                            @record.Vehicle.Name
+                                        </td>
+
+                                        <td>
+                                            @record.Operator.FullName
+                                        </td>
+
+                                        <td>
+                                            @record.FuelTruck.Vehicle.Name
+                                        </td>
+
+                                        <td>
+                                            @record.Volume
+                                        </td>
+
+                                        <td>
+                                            @record.CounterStart
+                                            -
+                                            @record.CounterEnd
+                                        </td>
+
+                                        <td>
+                                            @GetUssText(record)
+                                        </td>
+
+                                    </tr>
+                                }
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+        }
+    }
+
+</div>
+
+
+@code {
+
+    private DateOnly _fromDate =
+        DateOnly.FromDateTime(DateTime.Today);
+
+    private DateOnly _toDate =
+        DateOnly.FromDateTime(DateTime.Today);
+
+
+    private Guid? _selectedVehicleId;
+
+
+    private IReadOnlyList<Vehicle> _vehicles =
+        [];
+
+    private IReadOnlyList<FuelingRecord> _records =
+        [];
+
+
+    private bool _loading;
+
+    private bool _loaded;
+
+    private string? _errorMessage;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicles = await VehicleService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Не удалось загрузить список техники: {ex.Message}";
+        }
+    }
+
+
+    private async Task LoadRecords()
+    {
+        if (_toDate < _fromDate)
+        {
+            _errorMessage =
+                "Дата окончания не может быть раньше даты начала.";
+
+            return;
+        }
+
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var timeZone =
+                TimeZoneInfo.Local;
+
+            _records =
+                await FuelingRecordService.GetByPeriodAsync(
+                    _fromDate,
+                    _toDate,
+                    timeZone,
+                    _selectedVehicleId);
+
+            _loaded = true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Не удалось загрузить заправки: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+    private static string GetUssText(
+        FuelingRecord record)
+    {
+        if (record.UssRecords is not { Count: > 0 })
+            return "—";
+
+        var count =
+            record.UssRecords.Count;
+
+        var volume =
+            record.UssRecords.Sum(
+                x => x.VolumeLiters);
+
+        return count == 1
+            ? $"{volume:0.###} л"
+            : $"{count} записи, {volume:0.###} л";
+    }
+}

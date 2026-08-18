@@ -34,32 +34,38 @@
                                autofocus />
 
                     </div>
+                    <table class="table table-hover align-middle mb-0">
 
-                    <div class="list-group">
+                        <thead class="table-light"
+                               style="position: sticky; top: 0; z-index: 1;">
 
-                        @foreach (var driver in FilteredOperators)
-                        {
-                            <button type="button"
-                                    class="list-group-item list-group-item-action"
-                                    @ondblclick="() => SelectAsync(driver.Id)">
+                            <tr>
+                                <th style="width: 100%;">
+                                    Ф.И.О.
+                                </th>
+                            </tr>
 
-                                <div class="fw-semibold">
-                                    @driver.FullName
-                                </div>
+                        </thead>
 
-                                @if (!string.IsNullOrWhiteSpace(
-                                    driver.PersonnelNumber))
-                                {
-                                    <small class="text-muted">
-                                        Табельный номер:
-                                        @driver.PersonnelNumber
-                                    </small>
-                                }
+                        <tbody>
 
-                            </button>
-                        }
+                            @foreach (var driver in FilteredOperators)
+                            {
+                                <tr style="cursor: pointer;" @onclick="() => SelectAsync(driver.Id)">
 
-                    </div>
+                                    <td>
+                                        <div class="fw-semibold">
+                                            @driver.FullName
+                                        </div>
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+                    
 
                     @if (!FilteredOperators.Any())
                     {

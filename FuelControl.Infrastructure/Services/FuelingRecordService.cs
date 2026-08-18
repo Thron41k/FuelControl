@@ -21,6 +21,61 @@ public sealed class FuelingRecordService(
 
         var localEnd = date
             .AddDays(1)
+            .ToDateTime(
+                TimeOnly.MinValue);
+
+        var utcStart =
+            new DateTimeOffset(
+                    localStart,
+                    timeZone.GetUtcOffset(localStart))
+                .ToUniversalTime();
+
+        var utcEnd =
+            new DateTimeOffset(
+                    localEnd,
+                    timeZone.GetUtcOffset(localEnd))
+                .ToUniversalTime();
+
+        var query = dbContext.FuelingRecords
+            .AsNoTracking()
+            .Include(x => x.FuelTruck)
+            .ThenInclude(x => x.Vehicle)
+            .Include(x => x.Vehicle)
+            .Include(x => x.Operator)
+            .Include(x => x.UssRecords)
+            .Where(x =>
+                x.FuelingDateTime >= utcStart &&
+                x.FuelingDateTime < utcEnd);
+
+        if (fuelTruckId.HasValue)
+        {
+            query = query.Where(x =>
+                x.FuelTruckId == fuelTruckId.Value);
+        }
+
+        return await query
+            .OrderBy(x => x.FuelingDateTime)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<FuelingRecord>> GetByPeriodAsync(
+        DateOnly from,
+        DateOnly to,
+        TimeZoneInfo timeZone,
+        Guid? vehicleId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (to < from)
+        {
+            throw new ArgumentException(
+                "Дата окончания периода не может быть раньше даты начала.");
+        }
+
+        var localStart = from.ToDateTime(
+            TimeOnly.MinValue);
+
+        var localEnd = to
+            .AddDays(1)
             .ToDateTime(TimeOnly.MinValue);
 
         var utcStart = new DateTimeOffset(
@@ -35,12 +90,16 @@ public sealed class FuelingRecordService(
 
         return await dbContext.FuelingRecords
             .AsNoTracking()
+            .Include(x => x.FuelTruck)
+            .ThenInclude(x => x.Vehicle)
             .Include(x => x.Vehicle)
             .Include(x => x.Operator)
+            .Include(x => x.UssRecords)
             .Where(x =>
-                x.FuelTruckId == fuelTruckId &&
                 x.FuelingDateTime >= utcStart &&
-                x.FuelingDateTime < utcEnd)
+                x.FuelingDateTime < utcEnd &&
+                (!vehicleId.HasValue ||
+                 x.VehicleId == vehicleId.Value))
             .OrderBy(x => x.FuelingDateTime)
             .ToListAsync(cancellationToken);
     }

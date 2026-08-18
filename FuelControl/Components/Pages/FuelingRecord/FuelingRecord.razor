@@ -37,10 +37,10 @@
 
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
     {
         <div class="alert alert-danger">
-            @errorMessage
+            @_errorMessage
         </div>
     }
 
@@ -59,14 +59,14 @@
                     </label>
 
                     <select class="form-select"
-                            value="@selectedFuelTruckId"
+                            value="@_selectedFuelTruckId"
                             @onchange="OnFuelTruckChanged">
 
                         <option value="@Guid.Empty">
                             Выберите топливозаправщик
                         </option>
 
-                        @foreach (var fuelTruck in fuelTrucks)
+                        @foreach (var fuelTruck in _fuelTrucks)
                         {
                             <option value="@fuelTruck.Id">
                                 @GetFuelTruckName(fuelTruck)
@@ -85,7 +85,7 @@
 
                     <input type="date"
                            class="form-control"
-                           value="@selectedDate.ToString("yyyy-MM-dd")"
+                           value="@_selectedDate.ToString("yyyy-MM-dd")"
                            @onchange="OnDateChanged" />
 
                 </div>
@@ -102,7 +102,7 @@
 
         <div class="card-body p-0">
 
-            @if (isLoading)
+            @if (_isLoading)
             {
                 <div class="p-4 text-center">
 
@@ -117,13 +117,13 @@
 
                 </div>
             }
-            else if (selectedFuelTruckId == Guid.Empty)
+            else if (_selectedFuelTruckId == Guid.Empty)
             {
                 <div class="p-4 text-center text-muted">
                     Выберите топливозаправщик.
                 </div>
             }
-            else if (fuelingRecords.Count == 0)
+            else if (_fuelingRecords.Count == 0)
             {
                 <div class="p-4 text-center text-muted">
                     За выбранную дату заправок нет.
@@ -176,7 +176,7 @@
 
                         <tbody>
 
-                            @foreach (var record in fuelingRecords)
+                            @foreach (var record in _fuelingRecords)
                             {
                                 <tr>
 
@@ -242,9 +242,9 @@
 <!-- Диалог выбора техники -->
 
 <VehicleSelectDialog
-    Visible="@showVehicleDialog"
-    Vehicles="@vehicles"
-    SelectedVehicleId="@dialogVehicleId"
+    Visible="@_showVehicleDialog"
+    Vehicles="@_vehicles"
+    SelectedVehicleId="@_dialogVehicleId"
     OnSelected="@OnVehicleSelected"
     OnClosed="@CloseVehicleDialog" />
 
@@ -252,24 +252,25 @@
 <!-- Диалог выбора водителя -->
 
 <OperatorSelectDialog
-    Visible="@showOperatorDialog"
-    Operators="@operators"
-    SelectedOperatorId="@dialogOperatorId"
+    Visible="@_showOperatorDialog"
+    Operators="@_operators"
+    SelectedOperatorId="@_dialogOperatorId"
     OnSelected="@OnOperatorSelected"
     OnClosed="@CloseOperatorDialog" />
 
     
-<UssSelectDialog
-    Visible="@showUssDialog"
-    Events="@ussEvents"
-    SpeedReport="@speedReport"
-    SelectedEventIds="@selectedUssEventIds"
-    OnSelected="@OnUssSelected"
-    OnClosed="@CloseUssDialog" />
+<UssSelectDialog Visible="@_showUssDialog"
+                 Loading="@_isLoadingSpeed"
+                 Events="@_ussEvents"
+                 SpeedReport="@_speedReport"
+                 SelectedEventIds="@_selectedUssEventIds"
+                 AttachedEventIds="@GetAttachedUssEventIds()"
+                 OnSelected="@OnUssSelected"
+                 OnClosed="@CloseUssDialog" />
 
 <!-- Диалог добавления / редактирования -->
 
-@if (showDialog)
+@if (_showDialog)
 {
     <div class="modal fade show d-block fueling-record-modal"
          tabindex="-1"
@@ -283,7 +284,7 @@
 
         <h5 class="modal-title">
 
-            @(editingRecord is null
+            @(_editingRecord is null
                 ? "Добавление заправки"
                 : "Редактирование заправки")
 
@@ -310,7 +311,7 @@
 
                 <input type="date"
                        class="form-control"
-                       @bind="dialogDate" />
+                       @bind="_dialogDate" />
 
             </div>
 
@@ -325,7 +326,7 @@
 
                 <input type="time"
                        class="form-control"
-                       @bind="dialogTime" />
+                       @bind="_dialogTime" />
 
             </div>
 
@@ -397,7 +398,7 @@
                 <input type="number"
                        class="form-control"
                        min="0"
-                       @bind="dialogCounterStart" />
+                       @bind="_dialogCounterStart" />
 
             </div>
 
@@ -411,7 +412,7 @@
                 <input type="number"
                        class="form-control"
                        min="0"
-                       @bind="dialogCounterEnd" />
+                       @bind="_dialogCounterEnd" />
 
             </div>
 
@@ -425,7 +426,7 @@
                 <input type="number"
                        class="form-control"
                        min="1"
-                       @bind="dialogVolume" />
+                       @bind="_dialogVolume" />
 
             </div>
 
@@ -442,7 +443,7 @@
 
                     <input class="form-control"
                            readonly
-                           value="@GetUssSelectionText()"
+                                       value="@GetUssSelectionText(_editingRecord?.Id)"
                            placeholder="Показания УСС не выбраны" />
 
                     <button type="button"
@@ -490,7 +491,7 @@
 
     </div>
 }
-@if (showDeleteDialog && recordToDelete is not null)
+@if (_showDeleteDialog && _recordToDelete is not null)
 {
     <div class="modal fade show d-block"
          tabindex="-1"
@@ -524,22 +525,22 @@
                         <div>
                             <strong>Дата:</strong>
                             @FormatLocalDateTime(
-                                recordToDelete.FuelingDateTime)
+                                _recordToDelete.FuelingDateTime)
                         </div>
 
                         <div>
                             <strong>Техника:</strong>
-                            @recordToDelete.Vehicle?.Name
+                            @_recordToDelete.Vehicle?.Name
                         </div>
 
                         <div>
                             <strong>Водитель:</strong>
-                            @recordToDelete.Operator?.FullName
+                            @_recordToDelete.Operator?.FullName
                         </div>
 
                         <div>
                             <strong>Объём:</strong>
-                            @recordToDelete.Volume л
+                            @_recordToDelete.Volume л
                         </div>
 
                     </div>
@@ -580,71 +581,72 @@
 }
 
 @code {
-    private OmnicommSpeedReport? speedReport;
+    private OmnicommSpeedReport? _speedReport;
 
-    private bool isLoadingSpeed;
-    private OmnicommTimeZone? browserTimeZone;
-    private bool showDeleteDialog;
-    private bool showUssDialog;
+    private bool _isLoadingSpeed;
+    private OmnicommTimeZone? _browserTimeZone;
+    private bool _showDeleteDialog;
+    private bool _showUssDialog;
 
-    private List<OmnicommDeliveryEvent> ussEvents = [];
+    private List<OmnicommDeliveryEvent> _ussEvents = [];
 
-    private HashSet<int> selectedUssEventIds = [];
-    private FuelControl.Domain.Entities.FuelingRecord? recordToDelete;
-    private readonly List<FuelTruck> fuelTrucks = [];
-    private readonly List<Vehicle> vehicles = [];
-    private readonly List<Operator> operators = [];
+    private HashSet<int> _selectedUssEventIds = [];
+    private FuelControl.Domain.Entities.FuelingRecord? _recordToDelete;
+    private readonly List<FuelTruck> _fuelTrucks = [];
+    private readonly List<Vehicle> _vehicles = [];
+    private readonly List<Operator> _operators = [];
 
-    private List<FuelControl.Domain.Entities.FuelingRecord> fuelingRecords = [];
+    private List<FuelControl.Domain.Entities.FuelingRecord> _fuelingRecords = [];
 
-    private Guid selectedFuelTruckId = Guid.Empty;
+    private Guid _selectedFuelTruckId = Guid.Empty;
 
-    private DateOnly selectedDate =
+    private DateOnly _selectedDate =
         DateOnly.FromDateTime(DateTime.Now);
 
-    private bool isLoading;
+    private bool _isLoading;
 
-    private string? errorMessage;
+    private string? _errorMessage;
 
-    private bool showDialog;
-    private bool showVehicleDialog;
-    private bool showOperatorDialog;
+    private bool _showDialog;
+    private bool _showVehicleDialog;
+    private bool _showOperatorDialog;
 
-    private FuelControl.Domain.Entities.FuelingRecord? editingRecord;
+    private FuelControl.Domain.Entities.FuelingRecord? _editingRecord = null;
 
-    private DateOnly dialogDate;
+    private DateOnly _dialogDate;
 
-    private TimeOnly dialogTime;
+    private TimeOnly _dialogTime;
 
-    private Guid? dialogVehicleId;
+    private Guid? _dialogVehicleId;
 
-    private Guid? dialogOperatorId;
+    private Guid? _dialogOperatorId;
 
-    private int dialogCounterStart;
+    private int _dialogCounterStart;
 
-    private int dialogCounterEnd;
+    private int _dialogCounterEnd;
 
-    private int dialogVolume;
+    private int _dialogVolume;
+    private bool _ussSelectionInitialized;
 
-    private List<FuelingUssRecord> selectedUssRecords = [];
+    private List<FuelingUssRecord> _selectedUssRecords = [];
 
 
     private bool CanAddFuelingRecord =>
-        selectedFuelTruckId != Guid.Empty;
+        _selectedFuelTruckId != Guid.Empty;
 
 
     private bool CanSelectUss =>
-        selectedFuelTruckId != Guid.Empty
-        && dialogVehicleId.HasValue;
+        _selectedFuelTruckId != Guid.Empty
+        && _dialogVehicleId.HasValue;
 
 
     private bool CanSave =>
-        selectedFuelTruckId != Guid.Empty
-        && dialogVehicleId.HasValue
-        && dialogOperatorId.HasValue
-        && dialogVolume > 0
-        && dialogCounterStart >= 0
-        && dialogCounterEnd >= dialogCounterStart;
+        _selectedFuelTruckId != Guid.Empty
+        && _dialogVehicleId.HasValue
+        && _dialogOperatorId.HasValue
+        && _dialogVolume > 0
+        && _dialogCounterStart >= 0
+        && _dialogCounterEnd >= _dialogCounterStart;
 
 
     protected override async Task OnInitializedAsync()
@@ -655,21 +657,21 @@
 
     private async Task LoadReferenceDataAsync()
     {
-        fuelTrucks.Clear();
+        _fuelTrucks.Clear();
 
-        fuelTrucks.AddRange(
+        _fuelTrucks.AddRange(
             await FuelTruckService.GetAllAsync());
 
 
-        vehicles.Clear();
+        _vehicles.Clear();
 
-        vehicles.AddRange(
+        _vehicles.AddRange(
             await VehicleService.GetAllAsync());
 
 
-        operators.Clear();
+        _operators.Clear();
 
-        operators.AddRange(
+        _operators.AddRange(
             await OperatorService.GetAllAsync());
     }
 
@@ -677,17 +679,17 @@
     private async Task OnFuelTruckChanged(
         ChangeEventArgs args)
     {
-        errorMessage = null;
+        _errorMessage = null;
 
         if (Guid.TryParse(
                 args.Value?.ToString(),
                 out var id))
         {
-            selectedFuelTruckId = id;
+            _selectedFuelTruckId = id;
         }
         else
         {
-            selectedFuelTruckId = Guid.Empty;
+            _selectedFuelTruckId = Guid.Empty;
         }
 
         await LoadFuelingRecordsAsync();
@@ -697,13 +699,13 @@
     private async Task OnDateChanged(
         ChangeEventArgs args)
     {
-        errorMessage = null;
+        _errorMessage = null;
 
         if (DateOnly.TryParse(
                 args.Value?.ToString(),
                 out var date))
         {
-            selectedDate = date;
+            _selectedDate = date;
         }
 
         await LoadFuelingRecordsAsync();
@@ -712,148 +714,183 @@
 
     private async Task LoadFuelingRecordsAsync()
     {
-        if (selectedFuelTruckId == Guid.Empty)
+        if (_selectedFuelTruckId == Guid.Empty)
         {
-            fuelingRecords = [];
+            _fuelingRecords = [];
             return;
         }
 
-        isLoading = true;
+        _isLoading = true;
 
         try
         {
             var timeZone =
                 TimeZoneService.GetCurrentTimeZone();
 
-            fuelingRecords = (
+            _fuelingRecords = (
                 await FuelingRecordService.GetAllAsync(
-                    selectedDate,
+                    _selectedDate,
                     timeZone,
-                    selectedFuelTruckId,
+                    _selectedFuelTruckId,
                     CancellationToken.None))
                 .ToList();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
-            fuelingRecords = [];
+            _errorMessage = ex.Message;
+            _fuelingRecords = [];
         }
         finally
         {
-            isLoading = false;
+            _isLoading = false;
         }
     }
 
 
     private void OpenCreateDialog()
     {
-        if (selectedFuelTruckId == Guid.Empty)
+        if (_selectedFuelTruckId == Guid.Empty)
         {
-            errorMessage =
+            _errorMessage =
                 "Сначала выберите топливозаправщик.";
 
             return;
         }
 
-        errorMessage = null;
+        _errorMessage = null;
 
-        editingRecord = null;
+        _editingRecord = null;
 
-        dialogDate = selectedDate;
+        _dialogDate = _selectedDate;
 
-        dialogTime =
+        _dialogTime =
             TimeOnly.FromDateTime(DateTime.Now);
 
-        dialogVehicleId = null;
+        _dialogVehicleId = null;
 
-        dialogOperatorId = null;
+        _dialogOperatorId = null;
 
-        dialogCounterStart = 0;
+        _dialogCounterStart = 0;
 
-        dialogCounterEnd = 0;
+        _dialogCounterEnd = 0;
 
-        dialogVolume = 0;
+        _dialogVolume = 0;
 
-        selectedUssRecords = [];
-
-        showDialog = true;
-        speedReport = null;
-        isLoadingSpeed = false;
+        _selectedUssRecords = [];
+        _ussSelectionInitialized = true;
+        _showDialog = true;
+        _speedReport = null;
+        _selectedUssEventIds = [];
+        _ussEvents = [];
+        _isLoadingSpeed = false;
     }
 
+    private IReadOnlyList<FuelingUssRecord> GetSavedUssRecords()
+    {
+        if (_editingRecord is null)
+            return [];
 
-    private void OpenEditDialog(
+        return _fuelingRecords
+                   .FirstOrDefault(x => x.Id == _editingRecord.Id)?
+                   .UssRecords
+                   .ToList()
+               ?? [];
+    }
+
+    private IReadOnlySet<int> GetAttachedUssEventIds()
+    {
+        var currentFuelingRecordId = _editingRecord?.Id;
+
+        return _fuelingRecords
+            .Where(x =>
+                !currentFuelingRecordId.HasValue ||
+                x.Id != currentFuelingRecordId.Value)
+            .SelectMany(x => x.UssRecords)
+            .Select(x => x.OmnicommEventId)
+            .ToHashSet();
+    }
+
+    private async Task OpenEditDialog(
         FuelControl.Domain.Entities.FuelingRecord record)
     {
-        editingRecord = record;
+        _editingRecord = record;
 
         var localDateTime =
             TimeZoneService.ToLocal(
                 record.FuelingDateTime);
 
-        dialogDate =
+        _dialogDate =
             DateOnly.FromDateTime(
                 localDateTime.DateTime);
 
-        dialogTime =
+        _dialogTime =
             TimeOnly.FromDateTime(
                 localDateTime.DateTime);
 
-        dialogVehicleId =
+        _dialogVehicleId =
             record.VehicleId;
 
-        dialogOperatorId =
+        _dialogOperatorId =
             record.OperatorId;
 
-        dialogCounterStart =
+        _dialogCounterStart =
             record.CounterStart;
 
-        dialogCounterEnd =
+        _dialogCounterEnd =
             record.CounterEnd;
 
-        dialogVolume =
+        _dialogVolume =
             record.Volume;
 
-        selectedUssRecords = [];
+        _selectedUssRecords = [];
+        var ussRecords =
+            await FuelingUssService.GetByFuelingRecordIdAsync(
+                record.Id,
+                CancellationToken.None);
 
-        showDialog = true;
+        _selectedUssEventIds =
+            ussRecords
+                .Select(x => x.OmnicommEventId)
+                .ToHashSet();
+        _ussSelectionInitialized = true;
+        _showDialog = true;
     }
 
 
     private void CloseDialog()
     {
-        showDialog = false;
+        _showDialog = false;
 
-        editingRecord = null;
+        _editingRecord = null;
 
-        showVehicleDialog = false;
+        _showVehicleDialog = false;
 
-        showOperatorDialog = false;
+        _showOperatorDialog = false;
 
-        showDeleteDialog = false;
+        _showDeleteDialog = false;
 
-        recordToDelete = null;
+        _recordToDelete = null;
     }
 
 
     private void OpenVehicleDialog()
     {
-        showVehicleDialog = true;
+        _showVehicleDialog = true;
     }
 
 
     private void CloseVehicleDialog()
     {
-        showVehicleDialog = false;
+        _showVehicleDialog = false;
     }
 
 
     private Task OnVehicleSelected(
         Guid vehicleId)
     {
-        dialogVehicleId = vehicleId;
+        _dialogVehicleId = vehicleId;
 
-        showVehicleDialog = false;
+        _showVehicleDialog = false;
 
         return Task.CompletedTask;
     }
@@ -861,22 +898,22 @@
 
     private void OpenOperatorDialog()
     {
-        showOperatorDialog = true;
+        _showOperatorDialog = true;
     }
 
 
     private void CloseOperatorDialog()
     {
-        showOperatorDialog = false;
+        _showOperatorDialog = false;
     }
 
 
     private Task OnOperatorSelected(
         Guid operatorId)
     {
-        dialogOperatorId = operatorId;
+        _dialogOperatorId = operatorId;
 
-        showOperatorDialog = false;
+        _showOperatorDialog = false;
 
         return Task.CompletedTask;
     }
@@ -884,12 +921,12 @@
 
     private string GetSelectedVehicleName()
     {
-        if (!dialogVehicleId.HasValue)
+        if (!_dialogVehicleId.HasValue)
             return string.Empty;
 
-        return vehicles
+        return _vehicles
             .FirstOrDefault(
-                x => x.Id == dialogVehicleId.Value)
+                x => x.Id == _dialogVehicleId.Value)
             ?.Name
             ?? string.Empty;
     }
@@ -897,12 +934,12 @@
 
     private string GetSelectedOperatorName()
     {
-        if (!dialogOperatorId.HasValue)
+        if (!_dialogOperatorId.HasValue)
             return string.Empty;
 
-        return operators
+        return _operators
             .FirstOrDefault(
-                x => x.Id == dialogOperatorId.Value)
+                x => x.Id == _dialogOperatorId.Value)
             ?.FullName
             ?? string.Empty;
     }
@@ -928,120 +965,174 @@
     private string GetUssDisplayText(
         Guid fuelingRecordId)
     {
-        return "—";
-    }
+        var record = _fuelingRecords
+            .FirstOrDefault(x => x.Id == fuelingRecordId);
 
+        if (record is null || record.UssRecords.Count == 0)
+            return "—";
 
-    private string GetUssSelectionText()
-    {
-        if (selectedUssRecords.Count == 0)
-            return string.Empty;
-
-        if (selectedUssRecords.Count == 1)
+        if (record.UssRecords.Count == 1)
         {
-            var record =
-                selectedUssRecords[0];
+            var uss = record.UssRecords.First();
 
-            return
-                $"{record.StartDate:HH:mm:ss} - " +
-                $"{record.EndDate:HH:mm:ss}, " +
-                $"{record.VolumeLiters:N1} л";
+            return $"{uss.VolumeLiters:0.###} л";
         }
 
-        return
-            $"Выбрано записей: " +
-            $"{selectedUssRecords.Count}";
+        var totalVolume = record.UssRecords
+            .Sum(x => x.VolumeLiters);
+
+        return $"{totalVolume:0.###} л";
+    }
+
+    private string GetUssSelectionText(Guid? fuelingRecordId)
+    {
+        var selectedIds = _selectedUssEventIds;
+
+        if (selectedIds.Count == 0)
+            return string.Empty;
+
+        // Если события Omnicomm уже загружены —
+        // отображаем текущее состояние выбора пользователя.
+        if (_ussEvents.Count > 0)
+        {
+            var selectedEvents = _ussEvents
+                .Where(x => selectedIds.Contains(x.Id))
+                .ToList();
+
+            if (selectedEvents.Count > 0)
+            {
+                if (selectedEvents.Count == 1)
+                {
+                    var item = selectedEvents[0];
+
+                    return $"{item.VolumeLiters:0.###} л";
+                }
+
+                var totalVolume = selectedEvents
+                    .Sum(x => x.VolumeLiters);
+
+                return $"{totalVolume:0.###} л";
+            }
+        }
+
+        // Если Omnicomm ещё не загружен, используем сохранённые
+        // записи из FuelingRecord.
+        var fuelingRecord = _fuelingRecords
+            .FirstOrDefault(x => x.Id == fuelingRecordId);
+
+        if (fuelingRecord?.UssRecords is { Count: > 0 })
+        {
+            var savedRecords = fuelingRecord.UssRecords
+                .Where(x => selectedIds.Contains(x.OmnicommEventId))
+                .ToList();
+
+            if (savedRecords.Count == 1)
+            {
+                var item = savedRecords[0];
+
+                return $"{item.VolumeLiters:0.###} л";
+            }
+
+            if (savedRecords.Count > 1)
+            {
+                var totalVolume = savedRecords
+                    .Sum(x => x.VolumeLiters);
+
+                return $"{totalVolume:0.###} л";
+            }
+        }
+
+        return string.Empty;
     }
 
     private Task OnUssSelected(
         IReadOnlyList<int> eventIds)
     {
-        selectedUssEventIds = eventIds.ToHashSet();
-
-        showUssDialog = false;
+        _selectedUssEventIds = eventIds.ToHashSet();
+        _showUssDialog = false;
 
         return Task.CompletedTask;
     }
 
     private void CloseUssDialog()
     {
-        showUssDialog = false;
+        _showUssDialog = false;
     }
 
     private async Task OpenUssDialog()
     {
-        if (selectedFuelTruckId == Guid.Empty)
+        if (_selectedFuelTruckId == Guid.Empty)
             return;
 
-        if (!dialogVehicleId.HasValue)
+        if (!_dialogVehicleId.HasValue)
         {
-            errorMessage = "Сначала выберите технику.";
+            _errorMessage = "Сначала выберите технику.";
             return;
         }
 
-        errorMessage = null;
-        speedReport = null;
-
+        _errorMessage = null;
+        _speedReport = null;
+        _showUssDialog = true;
+        _isLoadingSpeed = true;
         try
         {
-            browserTimeZone =
+            _browserTimeZone =
                 await BrowserTimeZoneService.GetAsync();
-            ussEvents = (
+            _ussEvents = (
                     await FuelingUssService.GetAvailableEventsAsync(
-                        selectedFuelTruckId,
-                        dialogDate,
-                        browserTimeZone,
+                        _selectedFuelTruckId,
+                         _dialogDate,
+                        _browserTimeZone,
                         CancellationToken.None))
                 .ToList();
 
-            selectedUssEventIds = [];
 
-            if (ussEvents.Count == 0)
+            if (_ussEvents.Count == 0)
             {
-                showUssDialog = true;
+                _showUssDialog = true;
                 return;
             }
 
-            var vehicle = vehicles.FirstOrDefault(
-                x => x.Id == dialogVehicleId.Value);
+            var vehicle = _vehicles.FirstOrDefault(
+                x => x.Id == _dialogVehicleId.Value);
 
             if (vehicle is null)
             {
-                errorMessage = "Выбранная техника не найдена.";
+                _errorMessage = "Выбранная техника не найдена.";
                 return;
             }
 
             if (!vehicle.OmnicommObjectId.HasValue)
             {
-                errorMessage =
+                _errorMessage =
                     "У выбранной техники не указан OmnicommObjectId.";
 
                 return;
             }
 
-            var from = ussEvents.Min(x => x.StartDate);
-            var to = ussEvents.Max(x => x.EndDate);
+            var from = _ussEvents.Min(x => x.StartDate);
+            var to = _ussEvents.Max(x => x.EndDate);
 
-            isLoadingSpeed = true;
+            _isLoadingSpeed = true;
 
-            var vehicleOmnicommObjectId = fuelTrucks.First(x => x.Id == selectedFuelTruckId).Vehicle.OmnicommObjectId;
+            var vehicleOmnicommObjectId = _fuelTrucks.First(x => x.Id == _selectedFuelTruckId).Vehicle.OmnicommObjectId;
             if (vehicleOmnicommObjectId != null)
-                speedReport = await OmnicommSpeedService.GetSpeedAsync(
+                _speedReport = await OmnicommSpeedService.GetSpeedAsync(
                     vehicleOmnicommObjectId.Value,
                     from,
                     to,
-                    browserTimeZone,
+                    _browserTimeZone,
                     CancellationToken.None);
 
-            showUssDialog = true;
+            _showUssDialog = true;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            _errorMessage = ex.Message;
         }
         finally
         {
-            isLoadingSpeed = false;
+            _isLoadingSpeed = false;
         }
     }
 
@@ -1050,13 +1141,13 @@
         if (!CanSave)
             return;
 
-        errorMessage = null;
+        _errorMessage = null;
 
         try
         {
             var localDateTime =
-                dialogDate.ToDateTime(
-                    dialogTime);
+                _dialogDate.ToDateTime(
+                    _dialogTime);
 
             var timeZone =
                 TimeZoneService.GetCurrentTimeZone();
@@ -1074,71 +1165,120 @@
                 localDateTimeOffset.ToUniversalTime();
 
 
-            if (editingRecord is null)
+            if (_editingRecord is null)
             {
-                await FuelingRecordService.CreateAsync(
-                    selectedFuelTruckId,
-                    dialogVehicleId!.Value,
-                    dialogOperatorId!.Value,
+                var fuelingRecordId = await FuelingRecordService.CreateAsync(
+                    _selectedFuelTruckId,
+                    _dialogVehicleId!.Value,
+                    _dialogOperatorId!.Value,
                     fuelingDateTime,
-                    dialogVolume,
-                    dialogCounterStart,
-                    dialogCounterEnd,
+                    _dialogVolume,
+                    _dialogCounterStart,
+                    _dialogCounterEnd,
                     CancellationToken.None);
+                if (_selectedUssEventIds.Count > 0)
+                {
+                    await FuelingUssService.AttachAsync(
+                        fuelingRecordId,
+                        _selectedUssEventIds.ToList(),
+                        _browserTimeZone,
+                        CancellationToken.None);
+                }
             }
             else
             {
                 await FuelingRecordService.UpdateAsync(
-                    editingRecord.Id,
-                    selectedFuelTruckId,
-                    dialogVehicleId!.Value,
-                    dialogOperatorId!.Value,
+                    _editingRecord.Id,
+                    _selectedFuelTruckId,
+                    _dialogVehicleId!.Value,
+                    _dialogOperatorId!.Value,
                     fuelingDateTime,
-                    dialogVolume,
-                    dialogCounterStart,
-                    dialogCounterEnd,
+                    _dialogVolume,
+                    _dialogCounterStart,
+                    _dialogCounterEnd,
                     CancellationToken.None);
+                await UpdateUssRecordsAsync(_editingRecord.Id);
             }
-
-            showDialog = false;
+            _showDialog = false;
 
             await LoadFuelingRecordsAsync();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task UpdateUssRecordsAsync(
+        Guid fuelingRecordId)
+    {
+        var existingRecords =
+            await FuelingUssService.GetByFuelingRecordIdAsync(
+                fuelingRecordId,
+                CancellationToken.None);
+
+        var existingByEventId =
+            existingRecords.ToDictionary(
+                x => x.OmnicommEventId);
+
+        // Удаляем отвязанные события.
+        foreach (var existingRecord in existingRecords)
+        {
+            if (!_selectedUssEventIds.Contains(
+                    existingRecord.OmnicommEventId))
+            {
+                await FuelingUssService.DetachAsync(
+                    existingRecord.Id,
+                    CancellationToken.None);
+            }
+        }
+
+        // Добавляем новые события.
+        var idsToAttach =
+            _selectedUssEventIds
+                .Where(eventId =>
+                    !existingByEventId.ContainsKey(eventId))
+                .ToList();
+
+        if (idsToAttach.Count > 0)
+        {
+            await FuelingUssService.AttachAsync(
+                fuelingRecordId,
+                idsToAttach,
+                _browserTimeZone,
+                CancellationToken.None);
         }
     }
 
     private void OpenDeleteDialog(FuelControl.Domain.Entities.FuelingRecord record)
     {
-        errorMessage = null;
+        _errorMessage = null;
 
-        recordToDelete = record;
+        _recordToDelete = record;
 
-        showDeleteDialog = true;
+        _showDeleteDialog = true;
     }
 
     private void CloseDeleteDialog()
     {
-        showDeleteDialog = false;
+        _showDeleteDialog = false;
 
-        recordToDelete = null;
+        _recordToDelete = null;
     }
 
     private async Task ConfirmDeleteAsync()
     {
-        if (recordToDelete is null)
+        if (_recordToDelete is null)
             return;
 
-        errorMessage = null;
+        _errorMessage = null;
 
         try
         {
-            var recordId = recordToDelete.Id;
+            var recordId = _recordToDelete.Id;
 
-            showDeleteDialog = false;
-            recordToDelete = null;
+            _showDeleteDialog = false;
+            _recordToDelete = null;
 
             await FuelingRecordService.DeleteAsync(
                 recordId,
@@ -1148,14 +1288,14 @@
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            _errorMessage = ex.Message;
         }
     }
 
     private async Task DeleteAsync(
         FuelControl.Domain.Entities.FuelingRecord record)
     {
-        errorMessage = null;
+        _errorMessage = null;
 
         try
         {
@@ -1167,7 +1307,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            _errorMessage = ex.Message;
         }
     }
 }

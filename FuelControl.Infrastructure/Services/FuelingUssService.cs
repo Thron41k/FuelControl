@@ -42,7 +42,7 @@ public sealed class FuelingUssService(
                 "У техники топливозаправщика не указан OmnicommId.");
         }
 
-        var (from, to) = GetDayRange(date);
+        var (from, to) = GetDayRange(date,timeZone);
 
         var report = await omnicommReportClient.GetDeliveryReportAsync(
             [omnicommId],
@@ -75,16 +75,7 @@ public sealed class FuelingUssService(
             .Select(x => x.OmnicommEventId)
             .ToListAsync(cancellationToken);
 
-        if (attachedEventIds.Count == 0)
-        {
-            return events;
-        }
-
-        var attached = attachedEventIds.ToHashSet();
-
-        return events
-            .Where(x => !attached.Contains(x.Id))
-            .ToList();
+        return events;
     }
 
     public async Task<IReadOnlyList<FuelingUssRecord>> GetByFuelingRecordIdAsync(
@@ -103,7 +94,7 @@ public sealed class FuelingUssService(
     public async Task AttachAsync(
         Guid fuelingRecordId,
         IReadOnlyList<int> omnicommEventIds,
-        OmnicommTimeZone timeZone,
+        OmnicommTimeZone? timeZone,
         CancellationToken cancellationToken = default)
     {
         var userId = GetCurrentUserId();
@@ -121,13 +112,21 @@ public sealed class FuelingUssService(
                 nameof(omnicommEventIds));
         }
 
+        //var fuelingRecord = await dbContext.FuelingRecords
+        //    .SingleOrDefaultAsync(
+        //        x => x.Id == fuelingRecordId,
+        //        cancellationToken)
+        //    ?? throw new InvalidOperationException(
+        //        "Заправка не найдена.");
         var fuelingRecord = await dbContext.FuelingRecords
-            .SingleOrDefaultAsync(
-                x => x.Id == fuelingRecordId,
-                cancellationToken)
-            ?? throw new InvalidOperationException(
-                "Заправка не найдена.");
+                                .SingleOrDefaultAsync(
+                                    x => x.Id == fuelingRecordId,
+                                    cancellationToken)
+                            ?? throw new InvalidOperationException(
+                                "Заправка не найдена.");
 
+        Console.WriteLine(
+            $"FuelingRecord: {fuelingRecord.FuelingDateTime:O}");
         var fuelTruck = await dbContext.FuelTrucks
             .AsNoTracking()
             .Include(x => x.Vehicle)
@@ -149,9 +148,7 @@ public sealed class FuelingUssService(
                 "У техники топливозаправщика не указан OmnicommId.");
         }
 
-        var (from, to) = GetDayRange(
-            DateOnly.FromDateTime(
-                fuelingRecord.FuelingDateTime.DateTime));
+        var (from, to) = GetDayRange(GetDateInTimeZone(fuelingRecord.FuelingDateTime, timeZone), timeZone);
 
         /*
          * Получаем актуальный отчёт непосредственно перед
@@ -263,39 +260,40 @@ public sealed class FuelingUssService(
         return userId;
     }
 
+    private static DateOnly GetDateInTimeZone(DateTimeOffset dateTime, OmnicommTimeZone timeZone)
+    {
+        var targetZone = TimeZoneInfo.FindSystemTimeZoneById(
+            timeZone.TimeZone);
+        var targetTime = TimeZoneInfo.ConvertTime(dateTime, targetZone);
+        return DateOnly.FromDateTime(targetTime.Date);
+    }
+
     private static (
         DateTimeOffset From,
         DateTimeOffset To) GetDayRange(
-        DateOnly date)
+            DateOnly date, OmnicommTimeZone timeZone)
     {
-        /*
-         * Omnicomm работает с часовым поясом Asia/Chita.
-         *
-         * Поэтому дата пользователя сначала переводится
-         * в начало/конец дня этого часового пояса,
-         * после чего отправляется в API как Unix time.
-         */
-        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
-            "Asia/Chita");
+        var timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(
+            timeZone.TimeZone);
 
         var localStart = date.ToDateTime(
-            TimeOnly.MinValue,
-            DateTimeKind.Unspecified);
+            TimeOnly.MinValue);
 
         var localEnd = date
             .AddDays(1)
             .ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Unspecified);
+                TimeOnly.MinValue);
 
-        var from = new DateTimeOffset(
-            localStart,
-            timeZone.GetUtcOffset(localStart));
+        var utcStart =
+            new DateTimeOffset(
+                    localStart,
+                    timeZoneInfo.GetUtcOffset(localStart));
 
-        var to = new DateTimeOffset(
-            localEnd,
-            timeZone.GetUtcOffset(localEnd));
+        var utcEnd =
+            new DateTimeOffset(
+                    localEnd,
+                    timeZoneInfo.GetUtcOffset(localEnd));
 
-        return (from, to);
+        return (utcStart, utcEnd);
     }
 }
