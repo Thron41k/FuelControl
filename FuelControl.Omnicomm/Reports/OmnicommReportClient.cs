@@ -168,7 +168,7 @@ public sealed class OmnicommReportClient(
             type = "ASEReport",
             sync = 1,
             rebuild = true,
-            tz = timeZone,
+            tz = timeZone.TimeZone,
             meta = new
             {
                 report = "fueleventsreport",
@@ -325,7 +325,7 @@ public sealed class OmnicommReportClient(
             type = "ASEReport",
             sync = 1,
             rebuild = true,
-            tz = timeZone,
+            tz = timeZone.TimeZone,
 
             meta = new
             {

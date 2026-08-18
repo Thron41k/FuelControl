@@ -189,7 +189,7 @@
                                             </td>
 
                                             <td>
-                                                @item.VolumeLiters.ToString("N1")
+                                                @item.VolumeLiters.ToString("##.###")
                                             </td>
                                             <td>
                                                 @GetMaxSpeedText(item)
@@ -311,7 +311,7 @@
                         StringComparison.OrdinalIgnoreCase)
                     ||
                     x.VolumeLiters
-                        .ToString("N1")
+                        .ToString("##.###")
                         .Contains(
                             search,
                             StringComparison.OrdinalIgnoreCase));
