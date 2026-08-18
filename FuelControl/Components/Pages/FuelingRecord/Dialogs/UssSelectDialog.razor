@@ -25,21 +25,6 @@
 
                 <div class="modal-body">
 
-                    <!-- Поиск -->
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Поиск
-                        </label>
-
-                        <input type="text"
-                               class="form-control"
-                               placeholder="Введите название или объём..."
-                               @bind="searchText"
-                               @bind:event="oninput" />
-
-                    </div>
                     <!-- Фильтр по скорости -->
 
                     <div class="card mb-3">
@@ -55,7 +40,7 @@
                                         <input class="form-check-input"
                                                type="checkbox"
                                                id="speedFilterEnabled"
-                                               @bind="speedFilterEnabled" />
+                                               @bind="_speedFilterEnabled" />
 
                                         <label class="form-check-label"
                                                for="speedFilterEnabled">
@@ -78,12 +63,12 @@
                                            class="form-control"
                                            min="0"
                                            step="0.1"
-                                           @bind="maxAllowedSpeed"
-                                           disabled="@(!speedFilterEnabled)" />
+                                           @bind="_maxAllowedSpeed"
+                                           disabled="@(!_speedFilterEnabled)" />
 
                                 </div>
 
-                                @if (speedFilterEnabled)
+                                @if (_speedFilterEnabled)
                                 {
                                     <div class="col-md-3">
 
@@ -160,7 +145,7 @@
                                     @foreach (var item in FilteredEvents)
                                     {
                                         var isSelected =
-                                            selectedIds.Contains(item.Id);
+                                            _selectedIds.Contains(item.Id);
 
                                         <tr class="@(isSelected ? "table-primary" : "")"
                                             style="cursor: pointer;"
@@ -211,9 +196,9 @@
                     <div class="me-auto text-muted">
 
                         Выбрано:
-                        <strong>@selectedIds.Count</strong>
+                        <strong>@_selectedIds.Count</strong>
 
-                        @if (selectedIds.Count > 0)
+                        @if (_selectedIds.Count > 0)
                         {
                             <span class="ms-3">
                                 Объём:
@@ -233,7 +218,7 @@
 
                     <button type="button"
                             class="btn btn-primary"
-                            disabled="@(selectedIds.Count == 0)"
+                            disabled="@(_selectedIds.Count == 0)"
                             @onclick="Confirm">
 
                         <i class="bi bi-check-lg me-1"></i>
@@ -274,13 +259,11 @@
     public EventCallback OnClosed { get; set; }
 
 
-    private string searchText = string.Empty;
+    private HashSet<int> _selectedIds = [];
 
-    private HashSet<int> selectedIds = [];
+    private bool _speedFilterEnabled = true;
 
-    private bool speedFilterEnabled;
-
-    private decimal maxAllowedSpeed = 20m;
+    private decimal _maxAllowedSpeed = 20m;
 
 
     private decimal SelectedVolume
@@ -288,7 +271,7 @@
         get
         {
             return Events
-                .Where(x => selectedIds.Contains(x.Id))
+                .Where(x => _selectedIds.Contains(x.Id))
                 .Sum(x => x.VolumeLiters);
         }
     }
@@ -300,25 +283,8 @@
         {
             IEnumerable<OmnicommDeliveryEvent> result = Events;
 
-            // Поиск
-            if (!string.IsNullOrWhiteSpace(searchText))
-            {
-                var search = searchText.Trim();
-
-                result = result.Where(x =>
-                    x.Name.Contains(
-                        search,
-                        StringComparison.OrdinalIgnoreCase)
-                    ||
-                    x.VolumeLiters
-                        .ToString("##.###")
-                        .Contains(
-                            search,
-                            StringComparison.OrdinalIgnoreCase));
-            }
-
             // Фильтр по максимальной скорости
-            if (speedFilterEnabled)
+            if (_speedFilterEnabled)
             {
                 result = result.Where(HasAllowedSpeed);
             }
@@ -333,7 +299,7 @@
         if (!Visible)
             return;
 
-        selectedIds =
+        _selectedIds =
             SelectedEventIds.ToHashSet();
     }
 
@@ -347,7 +313,7 @@
             return false;
         }
 
-        return maxSpeed.Value <= maxAllowedSpeed;
+        return maxSpeed.Value <= _maxAllowedSpeed;
     }
 
 
@@ -373,9 +339,9 @@
     private void ToggleSelection(
         OmnicommDeliveryEvent item)
     {
-        if (!selectedIds.Add(item.Id))
+        if (!_selectedIds.Add(item.Id))
         {
-            selectedIds.Remove(item.Id);
+            _selectedIds.Remove(item.Id);
         }
     }
 
@@ -392,7 +358,7 @@
     private async Task Confirm()
     {
         await OnSelected.InvokeAsync(
-            selectedIds.ToList());
+            _selectedIds.ToList());
 
         await OnClosed.InvokeAsync();
     }
