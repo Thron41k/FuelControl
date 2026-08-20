@@ -19,12 +19,14 @@
 
                     <button type="button"
                             class="btn-close"
+                            disabled="@Loading"
                             @onclick="Close">
                     </button>
 
                 </div>
 
                 <div class="modal-body">
+
                     @if (Loading)
                     {
                         <div class="d-flex flex-column justify-content-center align-items-center py-5"
@@ -52,185 +54,211 @@
                     }
                     else
                     {
-                    <!-- Фильтр по скорости -->
+                        <!-- Фильтр по скорости -->
 
-                    <div class="card mb-3">
+                        <div class="card mb-3">
 
-                        <div class="card-body">
+                            <div class="card-body">
 
-                            <div class="row g-3 align-items-end">
+                                <div class="row g-3 align-items-end">
 
-                                <div class="col-md-5">
+                                    <div class="col-md-5">
 
-                                    <div class="form-check form-switch">
+                                        <div class="form-check form-switch">
 
-                                        <input class="form-check-input"
-                                               type="checkbox"
-                                               id="speedFilterEnabled"
-                                               @bind="_speedFilterEnabled" />
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   id="speedFilterEnabled"
+                                                   @bind="_speedFilterEnabled" />
 
-                                        <label class="form-check-label"
-                                               for="speedFilterEnabled">
+                                            <label class="form-check-label"
+                                                   for="speedFilterEnabled">
 
-                                            Фильтр по скорости
+                                                Фильтр по скорости
 
-                                        </label>
-
-                                    </div>
-
-                                </div>
-
-                                <div class="col-md-4">
-
-                                    <label class="form-label">
-                                        Максимальная скорость, км/ч
-                                    </label>
-
-                                    <input type="number"
-                                           class="form-control"
-                                           min="0"
-                                           step="0.1"
-                                           @bind="_maxAllowedSpeed"
-                                           disabled="@(!_speedFilterEnabled)" />
-
-                                </div>
-
-                                @if (_speedFilterEnabled)
-                                {
-                                    <div class="col-md-3">
-
-                                        <div class="text-muted small">
-
-                                            Показания отбираются,
-                                            если скорость на всём интервале
-                                            не превышает заданный предел.
+                                            </label>
 
                                         </div>
 
                                     </div>
-                                }
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label">
+                                            Максимальная скорость, км/ч
+                                        </label>
+
+                                        <input type="number"
+                                               class="form-control"
+                                               min="0"
+                                               step="0.1"
+                                               @bind="_maxAllowedSpeed"
+                                               disabled="@(!_speedFilterEnabled)" />
+
+                                    </div>
+
+                                    @if (_speedFilterEnabled)
+                                    {
+                                        <div class="col-md-3">
+
+                                            <div class="text-muted small">
+
+                                                Показания отбираются,
+                                                если скорость на всём интервале
+                                                не превышает заданный предел.
+
+                                            </div>
+
+                                        </div>
+                                    }
+
+                                </div>
 
                             </div>
 
                         </div>
 
-                    </div>
-                    @if (SpeedReport is null)
-                    {
-                        <div class="alert alert-warning">
 
-                            <i class="bi bi-exclamation-triangle me-2"></i>
+                        @if (SpeedReport is null)
+                        {
+                            <div class="alert alert-warning">
 
-                            Данные о скорости недоступны.
+                                <i class="bi bi-exclamation-triangle me-2"></i>
 
-                        </div>
-                    }
+                                Данные о скорости недоступны.
 
-                    @if (!FilteredEvents.Any())
-                    {
-                        <div class="text-center text-muted py-5">
-                            Показаний УСС за выбранную дату не найдено.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
+                            </div>
+                        }
 
-                            <table class="table table-hover align-middle mb-0">
 
-                                <thead>
+                        @if (!FilteredEvents.Any())
+                        {
+                            <div class="text-center text-muted py-5">
 
-                                    <tr>
+                                Показаний УСС за выбранную дату не найдено.
 
-                                        <th style="width: 50px;">
-                                        </th>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
 
-                                        <th>
-                                            Начало
-                                        </th>
+                                <table class="table table-hover align-middle mb-0">
 
-                                        <th>
-                                            Конец
-                                        </th>
+                                    <thead>
 
-                                        <th>
-                                            Название
-                                        </th>
+                                        <tr>
 
-                                        <th>
-                                            Объём, л
-                                        </th>
-                                        <th>
-                                            Макс. скорость
-                                        </th>
-                                    </tr>
+                                            <th style="width: 50px;">
+                                            </th>
 
-                                </thead>
+                                            <th>
+                                                Начало
+                                            </th>
 
-                                <tbody>
+                                            <th>
+                                                Конец
+                                            </th>
 
-                                    @foreach (var item in FilteredEvents)
-                                    {
-                                            var isSelected = IsSelected(item.Id);
+                                            <th>
+                                                Название
+                                            </th>
+
+                                            <th>
+                                                Объём, л
+                                            </th>
+
+                                            <th>
+                                                Макс. скорость
+                                            </th>
+
+                                        </tr>
+
+                                    </thead>
+
+                                    <tbody>
+
+                                        @foreach (var item in FilteredEvents)
+                                        {
+                                            var isSelected =
+                                                IsSelected(item.Id);
+
                                             var isAttachedToAnotherFueling =
                                                 IsAttachedToAnotherFueling(item.Id);
+
                                             <tr class="
                                                 @(isSelected ? "table-primary" : "")
-                                                @(isAttachedToAnotherFueling ? "table-secondary text-muted" : "")"
-                                                style="cursor: @(isAttachedToAnotherFueling ? "not-allowed" : "pointer");"
-                                                @ondblclick="() => SelectByDoubleClick(item, isAttachedToAnotherFueling)">
+                                                @(isAttachedToAnotherFueling
+                                                    ? "table-secondary text-muted"
+                                                    : "")"
+                                                style="cursor: @(isAttachedToAnotherFueling
+                                                                                                    ? "not-allowed"
+                                                                                                    : "pointer");"
+                                                @ondblclick="@(() =>
+                                                                                                    SelectByDoubleClick(
+                                                                                                        item,
+                                                                                                        isAttachedToAnotherFueling))">
 
-                                            <td>
+                                                <td>
 
-                                                <input type="checkbox"
-                                                       class="form-check-input"
-                                                       checked="@isSelected"
+                                                    <input type="checkbox"
+                                                           class="form-check-input"
+                                                           checked="@isSelected"
                                                            disabled="@isAttachedToAnotherFueling"
-                                                       @onclick:stopPropagation="true"
-                                                           @onchange="() => ToggleSelection(item, isAttachedToAnotherFueling)" />
+                                                           @onclick:stopPropagation="true"
+                                                           @onchange="@(() =>
+                                                                                                                          ToggleSelection(
+                                                                                                                              item,
+                                                                                                                              isAttachedToAnotherFueling))" />
 
-                                            </td>
+                                                </td>
 
-                                            <td>
-                                                @FormatUserTime(item.StartDate)
-                                            </td>
+                                                <td>
+                                                    @FormatUserTime(item.StartDate)
+                                                </td>
 
-                                            <td>
-                                                @FormatUserTime(item.EndDate)
-                                            </td>
+                                                <td>
+                                                    @FormatUserTime(item.EndDate)
+                                                </td>
 
-                                            <td>
-                                                @item.Name
-                                            </td>
+                                                <td>
+                                                    @item.Name
+                                                </td>
 
-                                            <td>
-                                                @item.VolumeLiters.ToString("##.###")
-                                            </td>
-                                            <td>
-                                                @GetMaxSpeedText(item)
-                                            </td>
-                                        </tr>
-                                    }
+                                                <td>
+                                                    @item.VolumeLiters.ToString("0.###")
+                                                </td>
 
-                                </tbody>
+                                                <td>
+                                                    @GetMaxSpeedText(item)
+                                                </td>
 
-                            </table>
+                                            </tr>
+                                        }
 
-                        </div>
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+                        }
                     }
-                    }
+
                 </div>
+
 
                 <div class="modal-footer">
 
                     @if (Loading)
                     {
                         <div class="me-auto text-muted small">
+
                             <span class="spinner-border spinner-border-sm me-2"
                                   role="status">
                             </span>
 
                             Выполняется загрузка данных…
+
                         </div>
                     }
                     else
@@ -243,15 +271,19 @@
                             @if (_selectedIds.Count > 0)
                             {
                                 <span class="ms-3">
+
                                     Объём:
+
                                     <strong>
                                         @SelectedVolume.ToString("0.###") л
                                     </strong>
+
                                 </span>
                             }
 
                         </div>
                     }
+
 
                     <button type="button"
                             class="btn btn-secondary"
@@ -262,12 +294,16 @@
 
                     </button>
 
+
                     <button type="button"
                             class="btn btn-primary"
                             disabled="@Loading"
                             @onclick="Confirm">
+
                         <i class="bi bi-check-lg me-1"></i>
+
                         Выбрать
+
                     </button>
 
                 </div>
@@ -279,6 +315,7 @@
     </div>
 }
 
+
 @code
 {
     [Parameter]
@@ -287,31 +324,47 @@
     [Parameter]
     public bool Visible { get; set; }
 
+
     [Parameter]
     public IReadOnlyList<OmnicommDeliveryEvent> Events { get; set; }
         = [];
+
 
     [Parameter]
     public IReadOnlyList<FuelingUssRecord> SavedUssRecords { get; set; }
         = [];
 
+
     [Parameter]
     public OmnicommSpeedReport? SpeedReport { get; set; }
+
 
     [Parameter]
     public IReadOnlySet<int> SelectedEventIds { get; set; }
         = new HashSet<int>();
 
+
+    /// <summary>
+    /// Идентификаторы событий УСС,
+    /// которые уже привязаны к другим заправкам.
+    /// </summary>
     [Parameter]
     public IReadOnlySet<int> AttachedEventIds { get; set; }
         = new HashSet<int>();
+
+
+    [Parameter]
+    public TimeZoneInfo UserTimeZone { get; set; }
+        = TimeZoneInfo.Utc;
+
+
     [Parameter]
     public EventCallback<IReadOnlyList<int>> OnSelected { get; set; }
 
+
     [Parameter]
     public EventCallback OnClosed { get; set; }
-    [Parameter]
-    public TimeZoneInfo? UserTimeZone { get; set; } = TimeZoneInfo.Utc;
+
 
     private HashSet<int> _selectedIds = [];
 
@@ -321,19 +374,23 @@
 
     private decimal _maxAllowedSpeed = 20m;
 
-    private bool IsAttachedToAnotherFueling(int eventId)
+
+    private bool IsAttachedToAnotherFueling(
+        int eventId)
     {
         return AttachedEventIds.Contains(eventId);
     }
 
-    private string FormatUserTime(DateTimeOffset dateTime)
+
+    private string FormatUserTime(
+        DateTimeOffset dateTime)
     {
-        if (UserTimeZone != null)
-            return TimeZoneInfo.ConvertTime(
+        return TimeZoneInfo.ConvertTime(
                 dateTime,
-                UserTimeZone).ToString("HH:mm:ss");
-        return dateTime.ToLocalTime().ToString("HH:mm:ss");
+                UserTimeZone)
+            .ToString("HH:mm:ss");
     }
+
 
     private decimal SelectedVolume
     {
@@ -354,10 +411,12 @@
                         out var omnicommEvent))
                 {
                     total += omnicommEvent.VolumeLiters;
+                    continue;
                 }
-                else if (savedById.TryGetValue(
-                             eventId,
-                             out var savedRecord))
+
+                if (savedById.TryGetValue(
+                        eventId,
+                        out var savedRecord))
                 {
                     total += savedRecord.VolumeLiters;
                 }
@@ -368,7 +427,8 @@
     }
 
 
-    private bool IsSelected(int eventId)
+    private bool IsSelected(
+        int eventId)
     {
         return _selectedIds.Contains(eventId);
     }
@@ -378,7 +438,8 @@
     {
         get
         {
-            IEnumerable<OmnicommDeliveryEvent> result = Events;
+            IEnumerable<OmnicommDeliveryEvent> result =
+                Events;
 
             if (_speedFilterEnabled)
             {
@@ -398,24 +459,27 @@
             return;
         }
 
-        if (!_selectionInitialized)
-        {
-            _selectedIds = SelectedEventIds.ToHashSet();
+        if (_selectionInitialized)
+            return;
 
-            _selectionInitialized = true;
-        }
+        _selectedIds =
+            SelectedEventIds.ToHashSet();
+
+        _selectionInitialized = true;
     }
 
 
     private bool HasAllowedSpeed(
         OmnicommDeliveryEvent item)
     {
-        var maxSpeed = GetMaxSpeed(item);
+        var maxSpeed =
+            GetMaxSpeed(item);
 
         if (!maxSpeed.HasValue)
             return false;
 
-        return maxSpeed.Value <= _maxAllowedSpeed;
+        return maxSpeed.Value <=
+               _maxAllowedSpeed;
     }
 
 
@@ -431,7 +495,8 @@
     private string GetMaxSpeedText(
         OmnicommDeliveryEvent item)
     {
-        var maxSpeed = GetMaxSpeed(item);
+        var maxSpeed =
+            GetMaxSpeed(item);
 
         return maxSpeed.HasValue
             ? $"{maxSpeed.Value:N1} км/ч"
