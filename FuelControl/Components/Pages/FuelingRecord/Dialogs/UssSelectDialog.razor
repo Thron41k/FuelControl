@@ -192,11 +192,11 @@
                                             </td>
 
                                             <td>
-                                                @item.StartDate.ToLocalTime().ToString("HH:mm:ss")
+                                                @FormatUserTime(item.StartDate)
                                             </td>
 
                                             <td>
-                                                @item.EndDate.ToLocalTime().ToString("HH:mm:ss")
+                                                @FormatUserTime(item.EndDate)
                                             </td>
 
                                             <td>
@@ -310,7 +310,8 @@
 
     [Parameter]
     public EventCallback OnClosed { get; set; }
-
+    [Parameter]
+    public TimeZoneInfo? UserTimeZone { get; set; } = TimeZoneInfo.Utc;
 
     private HashSet<int> _selectedIds = [];
 
@@ -323,6 +324,15 @@
     private bool IsAttachedToAnotherFueling(int eventId)
     {
         return AttachedEventIds.Contains(eventId);
+    }
+
+    private string FormatUserTime(DateTimeOffset dateTime)
+    {
+        if (UserTimeZone != null)
+            return TimeZoneInfo.ConvertTime(
+                dateTime,
+                UserTimeZone).ToString("HH:mm:ss");
+        return dateTime.ToLocalTime().ToString("HH:mm:ss");
     }
 
     private decimal SelectedVolume

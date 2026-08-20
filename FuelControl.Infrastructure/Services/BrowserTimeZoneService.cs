@@ -34,5 +34,7 @@ public sealed class BrowserTimeZoneService(
         public int WinterOffset { get; init; }
 
         public int SummerOffset { get; init; }
+
+        public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
     }
 }

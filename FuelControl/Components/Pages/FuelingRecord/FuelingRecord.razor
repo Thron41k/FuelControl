@@ -266,6 +266,7 @@
                  SelectedEventIds="@_selectedUssEventIds"
                  AttachedEventIds="@GetAttachedUssEventIds()"
                  OnSelected="@OnUssSelected"
+                 UserTimeZone="@GetTimeZoneInfo()"
                  OnClosed="@CloseUssDialog" />
 
 <!-- Диалог добавления / редактирования -->
@@ -628,8 +629,6 @@
     private int _dialogVolume;
     private bool _ussSelectionInitialized;
 
-    private List<FuelingUssRecord> _selectedUssRecords = [];
-
 
     private bool CanAddFuelingRecord =>
         _selectedFuelTruckId != Guid.Empty;
@@ -776,7 +775,6 @@
 
         _dialogVolume = 0;
 
-        _selectedUssRecords = [];
         _ussSelectionInitialized = true;
         _showDialog = true;
         _speedReport = null;
@@ -842,7 +840,6 @@
         _dialogVolume =
             record.Volume;
 
-        _selectedUssRecords = [];
         var ussRecords =
             await FuelingUssService.GetByFuelingRecordIdAsync(
                 record.Id,
@@ -956,6 +953,9 @@
     private string FormatLocalDateTime(
         DateTimeOffset utcDateTime)
     {
+        var timeZoneInfo = GetTimeZoneInfo();
+        if(timeZoneInfo != null) return TimeZoneInfo.ConvertTime(
+            utcDateTime, timeZoneInfo).ToString("HH:mm:ss");
         return TimeZoneService
             .ToLocal(utcDateTime)
             .ToString("HH:mm");
@@ -991,8 +991,6 @@
         if (selectedIds.Count == 0)
             return string.Empty;
 
-        // Если события Omnicomm уже загружены —
-        // отображаем текущее состояние выбора пользователя.
         if (_ussEvents.Count > 0)
         {
             var selectedEvents = _ussEvents
@@ -1015,8 +1013,6 @@
             }
         }
 
-        // Если Omnicomm ещё не загружен, используем сохранённые
-        // записи из FuelingRecord.
         var fuelingRecord = _fuelingRecords
             .FirstOrDefault(x => x.Id == fuelingRecordId);
 
@@ -1221,7 +1217,6 @@
             existingRecords.ToDictionary(
                 x => x.OmnicommEventId);
 
-        // Удаляем отвязанные события.
         foreach (var existingRecord in existingRecords)
         {
             if (!_selectedUssEventIds.Contains(
@@ -1233,7 +1228,6 @@
             }
         }
 
-        // Добавляем новые события.
         var idsToAttach =
             _selectedUssEventIds
                 .Where(eventId =>
@@ -1292,22 +1286,9 @@
         }
     }
 
-    private async Task DeleteAsync(
-        FuelControl.Domain.Entities.FuelingRecord record)
+    private TimeZoneInfo? GetTimeZoneInfo()
     {
-        _errorMessage = null;
-
-        try
-        {
-            await FuelingRecordService.DeleteAsync(
-                record.Id,
-                CancellationToken.None);
-
-            await LoadFuelingRecordsAsync();
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = ex.Message;
-        }
+        _browserTimeZone ??= BrowserTimeZoneService.GetAsync().Result;
+        return _browserTimeZone != null ? TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZone.TimeZone) : null;
     }
 }
