@@ -59,6 +59,7 @@ public sealed class FuelingRecordConfiguration
             .HasForeignKey(x => x.FuelingRecordId)
             .OnDelete(DeleteBehavior.Cascade);
 
+
         builder.HasIndex(x => x.FuelTruckId);
 
         builder.HasIndex(x => x.VehicleId);

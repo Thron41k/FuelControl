@@ -1,10 +1,12 @@
 ﻿@page "/fueling-records"
 @rendermode InteractiveServer
+
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Services.Interfaces
 
 @inject IFuelingRecordService FuelingRecordService
 @inject IVehicleService VehicleService
+@inject IUserTimeZoneService UserTimeZoneService
 
 <PageTitle>Заправки</PageTitle>
 
@@ -104,7 +106,18 @@
                     </button>
 
                 </div>
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        disabled="@(_loading || !_loaded || _syncing)"
+                        @onclick="SyncOmnicomm">
+    
+                    @if (_syncing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
 
+                    Обновить данные Omnicomm
+                </button>
             </div>
 
         </div>
@@ -197,9 +210,8 @@
                                     <tr>
 
                                         <td>
-                                            @record.FuelingDateTime
-                                            .ToLocalTime()
-                                            .ToString("dd.MM.yyyy HH:mm")
+                                            @FormatUserDateTime(
+                                                record.FuelingDateTime)
                                         </td>
 
                                         <td>
@@ -244,26 +256,26 @@
     }
 
 </div>
-
+@if (!_timeZoneLoaded && string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-info">
+        Загрузка...
+    </div>
+}
 
 @code {
 
-    private DateOnly _fromDate =
-        DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly _fromDate;
 
-    private DateOnly _toDate =
-        DateOnly.FromDateTime(DateTime.Today);
-
+    private DateOnly _toDate;
 
     private Guid? _selectedVehicleId;
 
+    private IReadOnlyList<Vehicle> _vehicles = [];
 
-    private IReadOnlyList<Vehicle> _vehicles =
-        [];
+    private IReadOnlyList<FuelingRecord> _records = [];
 
-    private IReadOnlyList<FuelingRecord> _records =
-        [];
-
+    private TimeZoneInfo? _userTimeZone;
 
     private bool _loading;
 
@@ -271,12 +283,16 @@
 
     private string? _errorMessage;
 
+    private bool _timeZoneLoaded;
+
+    private bool _syncing;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _vehicles = await VehicleService.GetAllAsync();
+            _vehicles =
+                await VehicleService.GetAllAsync();
         }
         catch (Exception ex)
         {
@@ -285,9 +301,53 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            _userTimeZone =
+                await UserTimeZoneService.GetAsync();
+
+            _timeZoneLoaded = true;
+
+            var userNow =
+                TimeZoneInfo.ConvertTime(
+                    DateTimeOffset.UtcNow,
+                    _userTimeZone);
+
+            var userDate =
+                DateOnly.FromDateTime(
+                    userNow.DateTime);
+
+            _fromDate = userDate;
+            _toDate = userDate;
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Не удалось определить часовой пояс пользователя: {ex.Message}";
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
 
     private async Task LoadRecords()
     {
+        if (!_timeZoneLoaded || _userTimeZone is null)
+        {
+            _errorMessage =
+                "Часовой пояс пользователя ещё не определён.";
+
+            return;
+        }
+
         if (_toDate < _fromDate)
         {
             _errorMessage =
@@ -301,14 +361,11 @@
 
         try
         {
-            var timeZone =
-                TimeZoneInfo.Local;
-
             _records =
                 await FuelingRecordService.GetByPeriodAsync(
                     _fromDate,
                     _toDate,
-                    timeZone,
+                    _userTimeZone,
                     _selectedVehicleId);
 
             _loaded = true;
@@ -322,6 +379,18 @@
         {
             _loading = false;
         }
+    }
+
+    private string FormatUserDateTime(
+        DateTimeOffset value)
+    {
+        if (_userTimeZone is null)
+            return value.ToString("dd.MM.yyyy HH:mm");
+
+        return TimeZoneInfo.ConvertTime(
+                value,
+                _userTimeZone)
+            .ToString("dd.MM.yyyy HH:mm");
     }
 
 
@@ -341,5 +410,39 @@
         return count == 1
             ? $"{volume:0.###} л"
             : $"{count} записи, {volume:0.###} л";
+    }
+
+    private async Task SyncOmnicomm()
+    {
+        if (_userTimeZone is null)
+        {
+            _errorMessage =
+                "Не удалось определить часовой пояс пользователя.";
+
+            return;
+        }
+
+        _syncing = true;
+        _errorMessage = null;
+
+        try
+        {
+            await OmnicommFuelingSyncService.SyncAsync(
+                _fromDate,
+                _toDate,
+                _selectedVehicleId,
+                _userTimeZone);
+
+            await LoadRecords();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Не удалось обновить данные Omnicomm: {ex.Message}";
+        }
+        finally
+        {
+            _syncing = false;
+        }
     }
 }

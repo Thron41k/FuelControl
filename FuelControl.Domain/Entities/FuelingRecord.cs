@@ -23,7 +23,11 @@ public sealed class FuelingRecord
 
     public DateTimeOffset? UpdatedAt { get; private set; }
     public Guid? UpdatedBy { get; private set; }
-
+    public FuelingOmnicommRecord? OmnicommRecord
+    {
+        get;
+        private set;
+    }
     public FuelTruck FuelTruck { get; private set; } = null!;
     public Vehicle Vehicle { get; private set; } = null!;
     public Operator Operator { get; private set; } = null!;
