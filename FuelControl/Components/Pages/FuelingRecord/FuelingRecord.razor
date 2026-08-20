@@ -15,77 +15,94 @@
 @inject IUserTimeZoneService UserTimeZoneService
 
 <PageTitle>Заправки</PageTitle>
+@if (!_timeZoneInitialized)
+{
+    <div class="text-center py-5">
 
-<div class="container-fluid">
+        <div class="spinner-border text-primary"
+             role="status">
+        </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-
-        <h3 class="mb-0">
-            Заправки
-        </h3>
-
-        <button type="button"
-                class="btn btn-primary"
-                disabled="@(!CanAddFuelingRecord)"
-                @onclick="OpenCreateDialog">
-
-            <i class="bi bi-plus-lg me-1"></i>
-
-            Добавить заправку
-        </button>
+        <div class="mt-3 text-muted">
+            Загрузка...
+        </div>
 
     </div>
+}
+else
+{
+    <div class="container-fluid">
 
-    @if (!string.IsNullOrWhiteSpace(_errorMessage))
-    {
-        <div class="alert alert-danger">
-            @_errorMessage
+        <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <h3 class="mb-0">
+                Заправки
+            </h3>
+
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(!CanAddFuelingRecord)"
+                    @onclick="OpenCreateDialog">
+
+                <i class="bi bi-plus-lg me-1"></i>
+
+                Добавить заправку
+            </button>
+
         </div>
-    }
 
-    <!-- Фильтр -->
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div class="alert alert-danger">
+                @_errorMessage
+            </div>
+        }
 
-    <div class="card mb-4">
+        <!-- Фильтр -->
 
-        <div class="card-body">
+        <div class="card mb-4">
 
-            <div class="row g-3">
+            <div class="card-body">
 
-                <div class="col-md-6">
+                <div class="row g-3">
 
-                    <label class="form-label">
-                        Топливозаправщик
-                    </label>
+                    <div class="col-md-6">
 
-                    <select class="form-select"
-                            value="@_selectedFuelTruckId"
-                            @onchange="OnFuelTruckChanged">
+                        <label class="form-label">
+                            Топливозаправщик
+                        </label>
 
-                        <option value="@Guid.Empty">
-                            Выберите топливозаправщик
-                        </option>
+                        <select class="form-select"
+                                value="@_selectedFuelTruckId"
+                                @onchange="OnFuelTruckChanged">
 
-                        @foreach (var fuelTruck in _fuelTrucks)
-                        {
-                            <option value="@fuelTruck.Id">
-                                @GetFuelTruckName(fuelTruck)
+                            <option value="@Guid.Empty">
+                                Выберите топливозаправщик
                             </option>
-                        }
 
-                    </select>
+                            @foreach (var fuelTruck in _fuelTrucks)
+                            {
+                                <option value="@fuelTruck.Id">
+                                    @GetFuelTruckName(fuelTruck)
+                                </option>
+                            }
 
-                </div>
+                        </select>
 
-                <div class="col-md-6">
+                    </div>
 
-                    <label class="form-label">
-                        Дата
-                    </label>
+                    <div class="col-md-6">
 
-                    <input type="date"
-                           class="form-control"
-                           value="@_selectedDate.ToString("yyyy-MM-dd")"
-                           @onchange="OnDateChanged" />
+                        <label class="form-label">
+                            Дата
+                        </label>
+
+                        <input type="date"
+                               class="form-control"
+                               value="@_selectedDate.ToString("yyyy-MM-dd")"
+                               @onchange="OnDateChanged"/>
+
+                    </div>
 
                 </div>
 
@@ -93,48 +110,46 @@
 
         </div>
 
-    </div>
+        <!-- Список заправок -->
 
-    <!-- Список заправок -->
+        <div class="card">
 
-    <div class="card">
+            <div class="card-body p-0">
 
-        <div class="card-body p-0">
+                @if (_isLoading)
+                {
+                    <div class="p-4 text-center">
 
-            @if (_isLoading)
-            {
-                <div class="p-4 text-center">
+                        <div class="spinner-border"
+                             role="status">
 
-                    <div class="spinner-border"
-                         role="status">
+                            <span class="visually-hidden">
+                                Загрузка...
+                            </span>
 
-                        <span class="visually-hidden">
-                            Загрузка...
-                        </span>
+                        </div>
 
                     </div>
+                }
+                else if (_selectedFuelTruckId == Guid.Empty)
+                {
+                    <div class="p-4 text-center text-muted">
+                        Выберите топливозаправщик.
+                    </div>
+                }
+                else if (_fuelingRecords.Count == 0)
+                {
+                    <div class="p-4 text-center text-muted">
+                        За выбранную дату заправок нет.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
 
-                </div>
-            }
-            else if (_selectedFuelTruckId == Guid.Empty)
-            {
-                <div class="p-4 text-center text-muted">
-                    Выберите топливозаправщик.
-                </div>
-            }
-            else if (_fuelingRecords.Count == 0)
-            {
-                <div class="p-4 text-center text-muted">
-                    За выбранную дату заправок нет.
-                </div>
-            }
-            else
-            {
-                <div class="table-responsive">
+                        <table class="table table-hover mb-0">
 
-                    <table class="table table-hover mb-0">
-
-                        <thead>
+                            <thead>
 
                             <tr>
 
@@ -171,9 +186,9 @@
 
                             </tr>
 
-                        </thead>
+                            </thead>
 
-                        <tbody>
+                            <tbody>
 
                             @foreach (var record in _fuelingRecords)
                             {
@@ -224,19 +239,19 @@
                                 </tr>
                             }
 
-                        </tbody>
+                            </tbody>
 
-                    </table>
+                        </table>
 
-                </div>
-            }
+                    </div>
+                }
+
+            </div>
 
         </div>
 
     </div>
-
-</div>
-
+}
 
 <!-- Диалог выбора техники -->
 
@@ -584,7 +599,6 @@
     private OmnicommSpeedReport? _speedReport;
 
     private bool _isLoadingSpeed;
-    private TimeZoneInfo? _userTimeZone;
     private OmnicommTimeZone? _omnicommTimeZone;
     private bool _showDeleteDialog;
     private bool _showUssDialog;
@@ -628,7 +642,9 @@
 
     private int _dialogVolume;
     private bool _ussSelectionInitialized;
+    private TimeZoneInfo _userTimeZone = TimeZoneInfo.Utc;
 
+    private bool _timeZoneInitialized;
 
     private bool CanAddFuelingRecord =>
         _selectedFuelTruckId != Guid.Empty;
@@ -648,17 +664,29 @@
         && _dialogCounterEnd >= _dialogCounterStart;
 
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
     {
-        _userTimeZone =
-            await UserTimeZoneService.GetAsync();
+        if (!firstRender)
+            return;
 
-        _omnicommTimeZone =
-            await UserTimeZoneService.GetOmnicommTimeZoneAsync();
+        try
+        {
+            _userTimeZone =
+                await UserTimeZoneService.GetAsync();
 
-        await LoadReferenceDataAsync();
+            _timeZoneInitialized = true;
+            await LoadReferenceDataAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                $"Не удалось определить часовой пояс пользователя: {ex.Message}";
+
+            await InvokeAsync(StateHasChanged);
+        }
     }
-
 
     private async Task LoadReferenceDataAsync()
     {
