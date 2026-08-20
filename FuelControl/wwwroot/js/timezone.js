@@ -1,5 +1,11 @@
 ﻿window.fuelControl = window.fuelControl || {};
 
+window.fuelControl.getTimeZoneId = function () {
+    return Intl.DateTimeFormat()
+        .resolvedOptions()
+        .timeZone;
+};
+
 window.fuelControl.getTimeZone = function () {
     const timeZone =
         Intl.DateTimeFormat().resolvedOptions().timeZone;

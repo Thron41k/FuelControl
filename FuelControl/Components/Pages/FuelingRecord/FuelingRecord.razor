@@ -10,10 +10,9 @@
 @inject IFuelTruckService FuelTruckService
 @inject IVehicleService VehicleService
 @inject IOperatorService OperatorService
-@inject ITimeZoneService TimeZoneService
 @inject IFuelingUssService FuelingUssService
 @inject IOmnicommSpeedService OmnicommSpeedService
-@inject IBrowserTimeZoneService BrowserTimeZoneService
+@inject IUserTimeZoneService UserTimeZoneService
 
 <PageTitle>Заправки</PageTitle>
 
@@ -266,7 +265,7 @@
                  SelectedEventIds="@_selectedUssEventIds"
                  AttachedEventIds="@GetAttachedUssEventIds()"
                  OnSelected="@OnUssSelected"
-                 UserTimeZone="@GetTimeZoneInfo()"
+                 UserTimeZone="@_userTimeZone!"
                  OnClosed="@CloseUssDialog" />
 
 <!-- Диалог добавления / редактирования -->
@@ -585,7 +584,8 @@
     private OmnicommSpeedReport? _speedReport;
 
     private bool _isLoadingSpeed;
-    private OmnicommTimeZone? _browserTimeZone;
+    private TimeZoneInfo? _userTimeZone;
+    private OmnicommTimeZone? _omnicommTimeZone;
     private bool _showDeleteDialog;
     private bool _showUssDialog;
 
@@ -650,6 +650,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _userTimeZone =
+            await UserTimeZoneService.GetAsync();
+
+        _omnicommTimeZone =
+            await UserTimeZoneService.GetOmnicommTimeZoneAsync();
+
         await LoadReferenceDataAsync();
     }
 
@@ -723,13 +729,16 @@
 
         try
         {
-            var timeZone =
-                TimeZoneService.GetCurrentTimeZone();
+            if (_userTimeZone is null)
+            {
+                _userTimeZone =
+                    await UserTimeZoneService.GetAsync();
+            }
 
             _fuelingRecords = (
                 await FuelingRecordService.GetAllAsync(
                     _selectedDate,
-                    timeZone,
+                    _userTimeZone,
                     _selectedFuelTruckId,
                     CancellationToken.None))
                 .ToList();
@@ -762,8 +771,16 @@
 
         _dialogDate = _selectedDate;
 
+        var now =
+            UserTimeZoneService.ToLocal(
+                DateTimeOffset.UtcNow);
+
+        _dialogDate =
+            _selectedDate;
+
         _dialogTime =
-            TimeOnly.FromDateTime(DateTime.Now);
+            TimeOnly.FromDateTime(
+                now.DateTime);
 
         _dialogVehicleId = null;
 
@@ -781,18 +798,6 @@
         _selectedUssEventIds = [];
         _ussEvents = [];
         _isLoadingSpeed = false;
-    }
-
-    private IReadOnlyList<FuelingUssRecord> GetSavedUssRecords()
-    {
-        if (_editingRecord is null)
-            return [];
-
-        return _fuelingRecords
-                   .FirstOrDefault(x => x.Id == _editingRecord.Id)?
-                   .UssRecords
-                   .ToList()
-               ?? [];
     }
 
     private IReadOnlySet<int> GetAttachedUssEventIds()
@@ -814,7 +819,7 @@
         _editingRecord = record;
 
         var localDateTime =
-            TimeZoneService.ToLocal(
+            UserTimeZoneService.ToLocal(
                 record.FuelingDateTime);
 
         _dialogDate =
@@ -951,14 +956,11 @@
 
 
     private string FormatLocalDateTime(
-        DateTimeOffset utcDateTime)
+        DateTimeOffset value)
     {
-        var timeZoneInfo = GetTimeZoneInfo();
-        if(timeZoneInfo != null) return TimeZoneInfo.ConvertTime(
-            utcDateTime, timeZoneInfo).ToString("HH:mm:ss");
-        return TimeZoneService
-            .ToLocal(utcDateTime)
-            .ToString("HH:mm");
+        return UserTimeZoneService
+            .ToLocal(value)
+            .ToString("HH:mm:ss");
     }
 
 
@@ -1072,13 +1074,13 @@
         _isLoadingSpeed = true;
         try
         {
-            _browserTimeZone =
-                await BrowserTimeZoneService.GetAsync();
+            _omnicommTimeZone ??= await UserTimeZoneService
+                .GetOmnicommTimeZoneAsync();
             _ussEvents = (
                     await FuelingUssService.GetAvailableEventsAsync(
                         _selectedFuelTruckId,
                          _dialogDate,
-                        _browserTimeZone,
+                         _omnicommTimeZone,
                         CancellationToken.None))
                 .ToList();
 
@@ -1117,10 +1119,8 @@
                     vehicleOmnicommObjectId.Value,
                     from,
                     to,
-                    _browserTimeZone,
+                    _omnicommTimeZone,
                     CancellationToken.None);
-
-            _showUssDialog = true;
         }
         catch (Exception ex)
         {
@@ -1143,22 +1143,12 @@
         {
             var localDateTime =
                 _dialogDate.ToDateTime(
-                    _dialogTime);
-
-            var timeZone =
-                TimeZoneService.GetCurrentTimeZone();
-
-            var offset =
-                timeZone.GetUtcOffset(
-                    localDateTime);
-
-            var localDateTimeOffset =
-                new DateTimeOffset(
-                    localDateTime,
-                    offset);
+                    _dialogTime,
+                    DateTimeKind.Unspecified);
 
             var fuelingDateTime =
-                localDateTimeOffset.ToUniversalTime();
+                UserTimeZoneService.ToUtc(
+                    localDateTime);
 
 
             if (_editingRecord is null)
@@ -1177,7 +1167,7 @@
                     await FuelingUssService.AttachAsync(
                         fuelingRecordId,
                         _selectedUssEventIds.ToList(),
-                        _browserTimeZone,
+                        _omnicommTimeZone!,
                         CancellationToken.None);
                 }
             }
@@ -1239,7 +1229,7 @@
             await FuelingUssService.AttachAsync(
                 fuelingRecordId,
                 idsToAttach,
-                _browserTimeZone,
+                _omnicommTimeZone!,
                 CancellationToken.None);
         }
     }
@@ -1284,11 +1274,5 @@
         {
             _errorMessage = ex.Message;
         }
-    }
-
-    private TimeZoneInfo? GetTimeZoneInfo()
-    {
-        _browserTimeZone ??= BrowserTimeZoneService.GetAsync().Result;
-        return _browserTimeZone != null ? TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZone.TimeZone) : null;
     }
 }
