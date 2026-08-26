@@ -2,11 +2,12 @@
 using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Infrastructure.Services.Models;
 using FuelControl.Omnicomm.Reports.Models;
+using Microsoft.Extensions.Options;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommFuelingMatcher(
-    OmnicommFuelingMatchingOptions options)
+    IOptions<OmnicommFuelingMatchingOptions> options)
     : IOmnicommFuelingMatcher
 {
     public IReadOnlyList<FuelingMatchResult> Match(
@@ -22,55 +23,45 @@ public sealed class OmnicommFuelingMatcher(
             return [];
         }
 
-        ValidateOptions();
-
-        var results = new List<FuelingMatchResult>();
-
         var usedEventIds = new HashSet<int>();
+
+        var results =
+            new List<FuelingMatchResult>();
 
         foreach (var fuelingRecord in fuelingRecords)
         {
-            if (fuelingRecord.Vehicle?.OmnicommObjectId
-                is not { } vehicleId)
+            if (fuelingRecord.Vehicle.OmnicommObjectId
+                is not { } omnicommVehicleId)
             {
                 continue;
             }
 
-            var candidates = omnicommEvents
+            var candidate = omnicommEvents
                 .Where(x =>
-                    x.VehicleId == vehicleId)
-
-                .Where(x =>
+                    x.VehicleId == omnicommVehicleId &&
+                    x.Type == OmnicommFuelEventType.Refuel &&
                     !usedEventIds.Contains(x.Id))
-
                 .Select(x =>
                     CreateCandidate(
                         fuelingRecord,
                         x))
-
-                .Where(x =>
-                    x is not null)
-
+                .Where(x => x is not null)
                 .Cast<FuelingMatchCandidate>()
+                .OrderBy(x => x.Score)
+                .FirstOrDefault();
 
-                .OrderBy(x =>
-                    x.Score)
-
-                .ToList();
-
-            if (candidates.Count == 0)
+            if (candidate is null)
+            {
                 continue;
-
-            var best =
-                candidates[0];
+            }
 
             usedEventIds.Add(
-                best.Event.Id);
+                candidate.Event.Id);
 
             results.Add(
                 new FuelingMatchResult(
                     fuelingRecord,
-                    best));
+                    candidate));
         }
 
         return results;
@@ -85,16 +76,25 @@ public sealed class OmnicommFuelingMatcher(
                 fuelingRecord.FuelingDateTime,
                 omnicommEvent);
 
-        if (timeDifference > options.TimeTolerance)
+        if (timeDifference >
+            options.Value.MaxTimeDifference)
+        {
             return null;
+        }
 
         var volumeDifference =
             Math.Abs(
                 fuelingRecord.Volume -
                 omnicommEvent.VolumeLiters);
 
+        var maxVolumeDifference =
+            Math.Max(
+                options.Value.MaxVolumeDifference,
+                fuelingRecord.Volume *
+                options.Value.MaxVolumeDeviationPercent);
+
         if (volumeDifference >
-            options.VolumeToleranceLiters)
+            maxVolumeDifference)
         {
             return null;
         }
@@ -102,7 +102,8 @@ public sealed class OmnicommFuelingMatcher(
         var score =
             CalculateScore(
                 timeDifference,
-                volumeDifference);
+                volumeDifference,
+                maxVolumeDifference);
 
         return new FuelingMatchCandidate(
             omnicommEvent,
@@ -111,86 +112,53 @@ public sealed class OmnicommFuelingMatcher(
             score);
     }
 
-    private static TimeSpan CalculateTimeDifference(
-        DateTimeOffset fuelingTime,
-        OmnicommFuelEvent omnicommEvent)
+    private decimal CalculateScore(
+        TimeSpan timeDifference,
+        decimal volumeDifference,
+        decimal maxVolumeDifference)
     {
-        var time =
-            fuelingTime.ToUniversalTime();
+        var timeScore =
+            options.Value.MaxTimeDifference <= TimeSpan.Zero
+                ? 0m
+                : (decimal)(
+                    timeDifference.TotalSeconds /
+                    options.Value.MaxTimeDifference.TotalSeconds);
+
+        var volumeScore =
+            maxVolumeDifference <= 0m
+                ? 0m
+                : volumeDifference /
+                  maxVolumeDifference;
+
+        // Меньше score = лучше.
+        return timeScore * 0.6m +
+               volumeScore * 0.4m;
+    }
+
+    private static TimeSpan CalculateTimeDifference(
+        DateTimeOffset fuelingDateTime,
+        OmnicommFuelEvent fuelEvent)
+    {
+        var fuelingTime =
+            fuelingDateTime.ToUniversalTime();
 
         var start =
-            omnicommEvent.StartDate.ToUniversalTime();
+            fuelEvent.StartDate.ToUniversalTime();
 
         var end =
-            omnicommEvent.EndDate.ToUniversalTime();
+            fuelEvent.EndDate.ToUniversalTime();
 
-        if (time >= start &&
-            time <= end)
+        if (fuelingTime >= start &&
+            fuelingTime <= end)
         {
             return TimeSpan.Zero;
         }
 
-        if (time < start)
+        if (fuelingTime < start)
         {
-            return start - time;
+            return start - fuelingTime;
         }
 
-        return time - end;
-    }
-
-    private double CalculateScore(
-        TimeSpan timeDifference,
-        decimal volumeDifference)
-    {
-        var timeScore =
-            options.TimeTolerance == TimeSpan.Zero
-                ? 0
-                : timeDifference.TotalSeconds /
-                  options.TimeTolerance.TotalSeconds;
-
-        var volumeScore =
-            options.VolumeToleranceLiters == 0
-                ? 0
-                : (double)(
-                    volumeDifference /
-                    options.VolumeToleranceLiters);
-
-        return
-            timeScore * options.TimeWeight +
-            volumeScore * options.VolumeWeight;
-    }
-
-    private void ValidateOptions()
-    {
-        if (options.VolumeToleranceLiters < 0)
-        {
-            throw new InvalidOperationException(
-                "VolumeToleranceLiters не может быть отрицательным.");
-        }
-
-        if (options.TimeTolerance < TimeSpan.Zero)
-        {
-            throw new InvalidOperationException(
-                "TimeTolerance не может быть отрицательным.");
-        }
-
-        if (options.TimeWeight < 0)
-        {
-            throw new InvalidOperationException(
-                "TimeWeight не может быть отрицательным.");
-        }
-
-        if (options.VolumeWeight < 0)
-        {
-            throw new InvalidOperationException(
-                "VolumeWeight не может быть отрицательным.");
-        }
-
-        if (options.TimeWeight == 0 &&
-            options.VolumeWeight == 0)
-        {
-            throw new InvalidOperationException(
-                "TimeWeight и VolumeWeight не могут одновременно быть равны нулю.");
-        }
+        return fuelingTime - end;
     }
 }

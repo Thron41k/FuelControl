@@ -4,7 +4,7 @@ namespace FuelControl.Infrastructure.Services.Interfaces;
 
 public interface IOmnicommFuelingSyncService
 {
-    Task SyncAsync(
+    Task<FuelingOmnicommSyncResult> SyncAsync(
         DateOnly from,
         DateOnly to,
         Guid? vehicleId,

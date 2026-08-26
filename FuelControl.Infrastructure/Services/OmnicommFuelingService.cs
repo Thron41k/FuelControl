@@ -20,7 +20,9 @@ public sealed class OmnicommFuelingService(
         ArgumentNullException.ThrowIfNull(userTimeZone);
 
         if (vehicleIds.Count == 0)
+        {
             return new OmnicommFuelingData();
+        }
 
         if (to <= from)
         {
@@ -33,14 +35,16 @@ public sealed class OmnicommFuelingService(
             .Distinct()
             .ToList();
 
-        var timeZone = CreateOmnicommTimeZone(userTimeZone);
+        var timeZone = CreateOmnicommTimeZone(
+            userTimeZone);
 
-        var report = await reportClient.GetFuelEventsReportAsync(
-            ids,
-            from,
-            to,
-            timeZone,
-            cancellationToken);
+        var report =
+            await reportClient.GetFuelEventsReportAsync(
+                ids,
+                from,
+                to,
+                timeZone,
+                cancellationToken);
 
         return new OmnicommFuelingData
         {
@@ -60,7 +64,8 @@ public sealed class OmnicommFuelingService(
         var winterOffset =
             (int)timeZone.BaseUtcOffset.TotalHours;
 
-        var summerOffset = winterOffset;
+        var summerOffset =
+            winterOffset;
 
         if (timeZone.SupportsDaylightSavingTime)
         {
