@@ -2,11 +2,16 @@
 @rendermode InteractiveServer
 
 @using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Services
 @using FuelControl.Infrastructure.Services.Interfaces
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject IFuelingRecordService FuelingRecordService
 @inject IVehicleService VehicleService
 @inject IUserTimeZoneService UserTimeZoneService
+@inject IOmnicommFuelingSyncService OmnicommFuelingSyncService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Заправки</PageTitle>
 
@@ -427,11 +432,25 @@
 
         try
         {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var userId =
+                authenticationState.User
+                    .FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(userId, out var matchedBy))
+            {
+                throw new InvalidOperationException(
+                    "Не удалось определить текущего пользователя.");
+            }
             await OmnicommFuelingSyncService.SyncAsync(
                 _fromDate,
                 _toDate,
                 _selectedVehicleId,
-                _userTimeZone);
+                _userTimeZone,
+                matchedBy);
 
             await LoadRecords();
         }

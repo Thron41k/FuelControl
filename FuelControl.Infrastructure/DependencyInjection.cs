@@ -102,6 +102,12 @@ public static class DependencyInjection
             IUserTimeZoneService,
             UserTimeZoneService>();
         services.AddScoped<IOmnicommFuelEventService, OmnicommFuelEventService>();
+        services.AddScoped<
+            IOmnicommFuelingService,
+            OmnicommFuelingService>();
+        services.AddScoped<
+            IOmnicommFuelingMatcher,
+            OmnicommFuelingMatcher>();
         return services;
     }
 }

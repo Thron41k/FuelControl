@@ -2,13 +2,12 @@
 
 namespace FuelControl.Infrastructure.Services.Interfaces;
 
-public interface IOmnicommFuelingSyncService
+public interface IOmnicommFuelingService
 {
-    Task SyncAsync(
-        DateOnly from,
-        DateOnly to,
-        Guid? vehicleId,
+    Task<OmnicommFuelingData> GetFuelingsAsync(
+        IReadOnlyCollection<long> vehicleIds,
+        DateTimeOffset from,
+        DateTimeOffset to,
         TimeZoneInfo userTimeZone,
-        Guid matchedBy,
         CancellationToken cancellationToken = default);
 }

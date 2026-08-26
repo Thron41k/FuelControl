@@ -1,6 +1,9 @@
 using FuelControl.Components;
 using FuelControl.Components.Account;
 using FuelControl.Infrastructure;
+using FuelControl.Infrastructure.Services;
+using FuelControl.Infrastructure.Services.Interfaces;
+using FuelControl.Infrastructure.Services.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +18,6 @@ builder.Services.AddScoped<IdentityRedirectManager>();
 
 builder.Services.AddInfrastructure(
     builder.Configuration);
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

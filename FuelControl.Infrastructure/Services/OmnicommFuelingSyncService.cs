@@ -1,26 +1,17 @@
 ﻿using FuelControl.Domain.Entities;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
-using FuelControl.Infrastructure.Services.Models;
-using FuelControl.Omnicomm.Reports.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommFuelingSyncService(
     FuelControlDbContext dbContext,
-    IOmnicommFuelingService omnicommFuelingService)
+    IOmnicommFuelingService omnicommFuelingService,
+    IOmnicommFuelingMatcher matcher)
     : IOmnicommFuelingSyncService
 {
-    // Допустимое отклонение объёма.
-    private const decimal VolumeToleranceLiters = 20m;
-
-    // Допустимое расстояние от времени заправки
-    // до события Omnicomm.
-    private static readonly TimeSpan TimeTolerance =
-        TimeSpan.FromMinutes(30);
-
-    public async Task<FuelingOmnicommSyncResult> SyncAsync(
+    public async Task SyncAsync(
         DateOnly from,
         DateOnly to,
         Guid? vehicleId,
@@ -28,342 +19,189 @@ public sealed class OmnicommFuelingSyncService(
         Guid matchedBy,
         CancellationToken cancellationToken = default)
     {
-        if (matchedBy == Guid.Empty)
-            throw new ArgumentException(
-                "Не указан пользователь.",
-                nameof(matchedBy));
+        ArgumentNullException.ThrowIfNull(userTimeZone);
 
         if (to < from)
+        {
             throw new ArgumentException(
-                "Дата окончания не может быть раньше даты начала.");
+                "Дата окончания не может быть раньше даты начала.",
+                nameof(to));
+        }
+
+        // ------------------------------------------------------------
+        // 1. Получаем технику
+        // ------------------------------------------------------------
 
         var vehiclesQuery =
             dbContext.Vehicles
-                .AsNoTracking()
-                .Where(x => x.OmnicommObjectId.HasValue);
+                .AsNoTracking();
 
         if (vehicleId.HasValue)
         {
-            vehiclesQuery = vehiclesQuery
-                .Where(x => x.Id == vehicleId.Value);
+            vehiclesQuery =
+                vehiclesQuery.Where(
+                    x => x.Id == vehicleId.Value);
         }
 
-        var vehicles = await vehiclesQuery
-            .ToListAsync(cancellationToken);
+        var vehicles =
+            await vehiclesQuery
+                .ToListAsync(cancellationToken);
 
         if (vehicles.Count == 0)
-        {
-            return new FuelingOmnicommSyncResult(
-                0,
-                0,
-                0,
-                0,
-                0);
-        }
+            return;
 
-        var vehicleIds = vehicles
-            .Select(x => x.Id)
-            .ToHashSet();
+        // ------------------------------------------------------------
+        // 2. Получаем Omnicomm ID техники
+        // ------------------------------------------------------------
 
-        var omnicommVehicleIds = vehicles
-            .Select(x => x.OmnicommObjectId!.Value)
-            .ToHashSet();
+        var omnicommVehicleIds =
+            vehicles
+                .Where(x => x.OmnicommObjectId.HasValue)
+                .Select(x => x.OmnicommObjectId!.Value)
+                .Distinct()
+                .ToList();
 
-        var fromDateTime = from.ToDateTime(
-            TimeOnly.MinValue,
-            DateTimeKind.Unspecified);
+        if (omnicommVehicleIds.Count == 0)
+            return;
 
-        var toDateTime = to
-            .AddDays(1)
-            .ToDateTime(
+        // ------------------------------------------------------------
+        // 3. Формируем период в часовом поясе пользователя
+        // ------------------------------------------------------------
+
+        var localFrom =
+            from.ToDateTime(
                 TimeOnly.MinValue,
                 DateTimeKind.Unspecified);
 
-        var localFrom = new DateTimeOffset(
-            fromDateTime,
-            userTimeZone.GetUtcOffset(fromDateTime));
+        var localTo =
+            to.AddDays(1)
+                .ToDateTime(
+                    TimeOnly.MinValue,
+                    DateTimeKind.Unspecified);
 
-        var localTo = new DateTimeOffset(
-            toDateTime,
-            userTimeZone.GetUtcOffset(toDateTime));
-
-        /*
-         * Загружаем наши заправки.
-         *
-         * Важно: сравнение периода выполняется через UTC,
-         * поэтому в БД не должно быть зависимости
-         * от часового пояса сервера.
-         */
-        var fromUtc = localFrom.ToUniversalTime();
-        var toUtc = localTo.ToUniversalTime();
-
-        var fuelingRecords = await dbContext.FuelingRecords
-            .Include(x => x.FuelTruck)
-            .Include(x => x.Vehicle)
-            .Where(x =>
-                vehicleIds.Contains(x.VehicleId) &&
-                x.FuelingDateTime >= fromUtc &&
-                x.FuelingDateTime < toUtc)
-            .ToListAsync(cancellationToken);
-
-        /*
-         * Получаем события Omnicomm.
-         */
-        var omnicommEvents =
-            await omnicommFuelingService.GetFuelingsAsync(
-                vehicles,
+        var fromOffset =
+            new DateTimeOffset(
                 localFrom,
+                userTimeZone.GetUtcOffset(localFrom));
+
+        var toOffset =
+            new DateTimeOffset(
                 localTo,
+                userTimeZone.GetUtcOffset(localTo));
+
+        // ------------------------------------------------------------
+        // 4. Загружаем события из Omnicomm
+        // ------------------------------------------------------------
+
+        var omnicommData =
+            await omnicommFuelingService.GetFuelingsAsync(
+                omnicommVehicleIds,
+                fromOffset,
+                toOffset,
                 userTimeZone,
                 cancellationToken);
 
-        /*
-         * Загружаем существующие связи.
-         */
-        var fuelingRecordIds = fuelingRecords
-            .Select(x => x.Id)
-            .ToHashSet();
+        if (omnicommData.Events.Count == 0)
+            return;
 
-        var existingLinks = await dbContext
-            .FuelingOmnicommRecords
-            .Where(x => fuelingRecordIds.Contains(x.FuelingRecordId))
-            .ToListAsync(cancellationToken);
+        // ------------------------------------------------------------
+        // 5. Получаем записи заправок из нашей БД
+        // ------------------------------------------------------------
 
-        /*
-         * Чтобы один Omnicomm event
-         * не был привязан к нескольким заправкам.
-         */
-        var usedOmnicommEventIds = existingLinks
-            .Select(x => x.OmnicommEventId)
-            .ToHashSet();
+        var fuelingRecords =
+            await dbContext.FuelingRecords
+                .Include(x => x.Vehicle)
+                .Where(x =>
+                    x.FuelingDateTime >= fromOffset &&
+                    x.FuelingDateTime < toOffset)
+                .Where(x =>
+                    !vehicleId.HasValue ||
+                    x.VehicleId == vehicleId.Value)
+                .ToListAsync(cancellationToken);
 
-        var created = 0;
-        var updated = 0;
-        var unlinked = 0;
+        if (fuelingRecords.Count == 0)
+            return;
 
-        /*
-         * При полной пересинхронизации старые связи
-         * должны быть освобождены.
-         *
-         * Поэтому сначала очищаем набор занятых событий
-         * и далее строим связи заново.
-         */
-        usedOmnicommEventIds.Clear();
+        // ------------------------------------------------------------
+        // 6. Получаем существующие связи
+        // ------------------------------------------------------------
 
-        foreach (var fuelingRecord in fuelingRecords)
+        var fuelingRecordIds =
+            fuelingRecords
+                .Select(x => x.Id)
+                .ToList();
+
+        var existingLinks =
+            await dbContext.FuelingOmnicommRecords
+                .Where(x =>
+                    fuelingRecordIds.Contains(
+                        x.FuelingRecordId))
+                .ToListAsync(cancellationToken);
+
+        // ------------------------------------------------------------
+        // 7. Выполняем сопоставление
+        // ------------------------------------------------------------
+
+        var matches =
+            matcher.Match(
+                fuelingRecords,
+                omnicommData.Events);
+
+        if (matches.Count == 0)
+            return;
+
+        // ------------------------------------------------------------
+        // 8. Сохраняем результаты
+        // ------------------------------------------------------------
+
+        foreach (var match in matches)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var candidates = omnicommEvents
-                .Where(x =>
-                    x.VehicleId ==
-                    fuelingRecord.Vehicle.OmnicommObjectId)
+            var fuelingRecordId =
+                match.FuelingRecord.Id;
 
-                .Where(x =>
-                    IsTimeMatch(
-                        fuelingRecord,
-                        x))
+            var omnicommEvent =
+                match.Candidate.Event;
 
-                .Where(x =>
-                    IsVolumeMatch(
-                        fuelingRecord,
-                        x))
-
-                .OrderBy(x =>
-                    GetMatchScore(
-                        fuelingRecord,
-                        x))
-                .ToList();
-
-            var matchedEvent = candidates
-                .FirstOrDefault(x =>
-                    !usedOmnicommEventIds.Contains(x.Id));
-
-            var existingLink = existingLinks
-                .FirstOrDefault(x =>
-                    x.FuelingRecordId == fuelingRecord.Id);
-
-            if (matchedEvent is null)
-            {
-                if (existingLink is not null)
-                {
-                    dbContext.FuelingOmnicommRecords
-                        .Remove(existingLink);
-
-                    unlinked++;
-                }
-
-                continue;
-            }
-
-            usedOmnicommEventIds.Add(
-                matchedEvent.Id);
+            var existingLink =
+                existingLinks.FirstOrDefault(
+                    x =>
+                        x.FuelingRecordId ==
+                        fuelingRecordId);
 
             if (existingLink is null)
             {
-                var entity = CreateOmnicommRecord(
-                    fuelingRecord,
-                    matchedEvent,
-                    matchedBy);
+                var entity =
+                    new FuelingOmnicommRecord(
+                        fuelingRecordId,
+                        omnicommEvent.Id,
+                        omnicommData.ReportId,
+                        omnicommEvent.VehicleId,
+                        omnicommEvent.Name,
+                        omnicommEvent.StartDate,
+                        omnicommEvent.EndDate,
+                        omnicommEvent.VolumeLiters,
+                        matchedBy);
 
-                dbContext.FuelingOmnicommRecords
-                    .Add(entity);
-
-                created++;
+                dbContext.FuelingOmnicommRecords.Add(
+                    entity);
             }
             else
             {
                 existingLink.Update(
-                    matchedEvent.Id,
-                    matchedEvent.ReportId,
-                    matchedEvent.VehicleId,
-                    matchedEvent.Name,
-                    matchedEvent.StartDate,
-                    matchedEvent.EndDate,
-                    matchedEvent.VolumeLiters,
+                    omnicommEvent.Id,
+                    omnicommData.ReportId,
+                    omnicommEvent.VehicleId,
+                    omnicommEvent.Name,
+                    omnicommEvent.StartDate,
+                    omnicommEvent.EndDate,
+                    omnicommEvent.VolumeLiters,
                     matchedBy);
-
-                updated++;
             }
         }
 
-        /*
-         * Удаляем старые связи с заправками,
-         * которые больше не входят в выбранный набор.
-         *
-         * Например, если пользователь синхронизирует
-         * только одну машину.
-         */
-        var obsoleteLinks = await dbContext
-            .FuelingOmnicommRecords
-            .Where(x =>
-                fuelingRecordIds.Contains(x.FuelingRecordId))
-            .ToListAsync(cancellationToken);
-
-        /*
-         * Здесь после основного цикла obsoleteLinks
-         * фактически содержит только те связи,
-         * которые могли остаться без соответствующего события.
-         *
-         * Основная очистка уже выполняется выше.
-         */
-
         await dbContext.SaveChangesAsync(
             cancellationToken);
-
-        return new FuelingOmnicommSyncResult(
-            fuelingRecords.Count,
-            omnicommEvents.Count,
-            created,
-            updated,
-            unlinked);
-    }
-
-    private static FuelingOmnicommRecord CreateOmnicommRecord(
-        FuelingRecord fuelingRecord,
-        OmnicommFuelEvent omnicommEvent,
-        Guid matchedBy)
-    {
-        return new FuelingOmnicommRecord(
-            fuelingRecord.Id,
-            omnicommEvent.Id,
-            omnicommEvent.ReportId,
-            omnicommEvent.VehicleId,
-            omnicommEvent.Name,
-            omnicommEvent.StartDate,
-            omnicommEvent.EndDate,
-            omnicommEvent.VolumeLiters,
-            matchedBy);
-    }
-
-    private static bool IsTimeMatch(
-        FuelingRecord fuelingRecord,
-        OmnicommFuelEvent omnicommEvent)
-    {
-        var fuelingTime =
-            fuelingRecord.FuelingDateTime.ToUniversalTime();
-
-        var start =
-            omnicommEvent.StartDate.ToUniversalTime();
-
-        var end =
-            omnicommEvent.EndDate.ToUniversalTime();
-
-        /*
-         * Вариант 1:
-         * время нашей заправки попадает
-         * непосредственно в интервал Omnicomm.
-         */
-        if (fuelingTime >= start &&
-            fuelingTime <= end)
-        {
-            return true;
-        }
-
-        /*
-         * Вариант 2:
-         * допускаем небольшое расхождение.
-         */
-        var distance = fuelingTime < start
-            ? start - fuelingTime
-            : fuelingTime - end;
-
-        return distance <= TimeTolerance;
-    }
-
-    private static bool IsVolumeMatch(
-        FuelingRecord fuelingRecord,
-        OmnicommFuelEvent omnicommEvent)
-    {
-        var difference =
-            Math.Abs(
-                fuelingRecord.Volume -
-                omnicommEvent.VolumeLiters);
-
-        return difference <= VolumeToleranceLiters;
-    }
-
-    private static double GetMatchScore(
-        FuelingRecord fuelingRecord,
-        OmnicommFuelEvent omnicommEvent)
-    {
-        var fuelingTime =
-            fuelingRecord.FuelingDateTime.ToUniversalTime();
-
-        var start =
-            omnicommEvent.StartDate.ToUniversalTime();
-
-        var end =
-            omnicommEvent.EndDate.ToUniversalTime();
-
-        double timeDistance;
-
-        if (fuelingTime >= start &&
-            fuelingTime <= end)
-        {
-            timeDistance = 0;
-        }
-        else
-        {
-            timeDistance =
-                Math.Min(
-                    Math.Abs(
-                        (fuelingTime - start).TotalSeconds),
-                    Math.Abs(
-                        (fuelingTime - end).TotalSeconds));
-        }
-
-        var volumeDifference =
-            Math.Abs(
-                (double)(
-                    fuelingRecord.Volume -
-                    omnicommEvent.VolumeLiters));
-
-        /*
-         * Время имеет больший вес,
-         * объём используется как дополнительный критерий.
-         */
-        return timeDistance +
-               volumeDifference * 10;
     }
 }
