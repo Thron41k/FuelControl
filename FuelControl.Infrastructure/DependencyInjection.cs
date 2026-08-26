@@ -101,7 +101,7 @@ public static class DependencyInjection
         services.AddScoped<
             IUserTimeZoneService,
             UserTimeZoneService>();
-        services.AddScoped<IOmnicommFuelingService, OmnicommFuelingService>();
+        services.AddScoped<IOmnicommFuelEventService, OmnicommFuelEventService>();
         return services;
     }
 }
