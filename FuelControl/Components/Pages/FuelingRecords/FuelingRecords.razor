@@ -5,6 +5,7 @@
 @using FuelControl.Infrastructure.Services
 @using FuelControl.Infrastructure.Services.Interfaces
 @using System.Security.Claims
+@using FuelControl.Infrastructure.Services.Models
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IFuelingRecordService FuelingRecordService
@@ -138,7 +139,19 @@
         </div>
     }
 
-
+    @if (_lastSyncResult is not null && string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-info">
+            Обработано заправок:
+            <strong>@_lastSyncResult.FuelingRecordsCount</strong>,
+            событий Omnicomm:
+            <strong>@_lastSyncResult.OmnicommEventsCount</strong>,
+            создано связей:
+            <strong>@_lastSyncResult.CreatedCount</strong>,
+            обновлено:
+            <strong>@_lastSyncResult.UpdatedCount</strong>.
+        </div>
+    }
     <!-- Загрузка -->
     @if (_loading)
     {
@@ -291,6 +304,7 @@
     private bool _timeZoneLoaded;
 
     private bool _syncing;
+    private FuelingOmnicommSyncResult? _lastSyncResult;
 
     protected override async Task OnInitializedAsync()
     {
@@ -419,10 +433,18 @@
 
     private async Task SyncOmnicomm()
     {
-        if (_userTimeZone is null)
+        if (!_timeZoneLoaded || _userTimeZone is null)
         {
             _errorMessage =
-                "Не удалось определить часовой пояс пользователя.";
+                "Часовой пояс пользователя ещё не определён.";
+
+            return;
+        }
+
+        if (_toDate < _fromDate)
+        {
+            _errorMessage =
+                "Дата окончания не может быть раньше даты начала.";
 
             return;
         }
@@ -445,12 +467,14 @@
                 throw new InvalidOperationException(
                     "Не удалось определить текущего пользователя.");
             }
-            await OmnicommFuelingSyncService.SyncAsync(
-                _fromDate,
-                _toDate,
-                _selectedVehicleId,
-                _userTimeZone,
-                matchedBy);
+
+            _lastSyncResult =
+                await OmnicommFuelingSyncService.SyncAsync(
+                    _fromDate,
+                    _toDate,
+                    _selectedVehicleId,
+                    _userTimeZone,
+                    matchedBy);
 
             await LoadRecords();
         }

@@ -254,15 +254,16 @@ public sealed class OmnicommReportClient(
         };
     }
 
-    private static OmnicommFuelEvent MapFuelEvent(OmnicommFuelEventRowDto row)
+    private static OmnicommFuelEvent MapFuelEvent(
+        OmnicommFuelEventRowDto row)
     {
-        double? lon = null;
-        double? lat = null;
+        double? longitude = null;
+        double? latitude = null;
 
-        if (row.Address is { Length: >= 2 })
+        if (row.Coordinates is { Length: >= 2 })
         {
-            lon = row.Address[0];
-            lat = row.Address[1];
+            longitude = row.Coordinates[0];
+            latitude = row.Coordinates[1];
         }
 
         return new OmnicommFuelEvent
@@ -271,16 +272,32 @@ public sealed class OmnicommReportClient(
             VehicleId = row.VehicleID,
             Name = row.Name,
             Type = MapFuelEventType(row.Type),
-            VolumeLiters = row.Volume / 10m,
-            StartDate = DateTimeOffset.FromUnixTimeMilliseconds(row.Startdate),
-            EndDate = DateTimeOffset.FromUnixTimeMilliseconds(row.Enddate),
-            EventDate = DateTimeOffset.FromUnixTimeMilliseconds(row.Eventdate),
+
+            VolumeLiters =
+                row.Volume / 10m,
+
+            StartDate =
+                DateTimeOffset.FromUnixTimeMilliseconds(
+                    row.Startdate),
+
+            EndDate =
+                DateTimeOffset.FromUnixTimeMilliseconds(
+                    row.Enddate),
+
+            EventDate =
+                DateTimeOffset.FromUnixTimeMilliseconds(
+                    row.Eventdate),
+
             TankNumber = row.TankNmb,
-            Longitude = lon,
-            Latitude = lat,
-            Address = row.ParseAddress,
+
+            Longitude = longitude,
+            Latitude = latitude,
+
+            Address = row.Address,
+
             DriverId = row.DriverID,
             DriverName = row.Driver,
+
             IsFtc = row.IsFTC,
             IsLls5 = row.IsLLS5,
             Exclusion = row.Exclusion

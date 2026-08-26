@@ -45,14 +45,28 @@ public sealed class OmnicommFuelingService(
                 to,
                 timeZone,
                 cancellationToken);
+        Console.WriteLine(
+            $"Omnicomm report: " +
+            $"ReportId={report.ReportId}, " +
+            $"Total={report.TotalRecords}, " +
+            $"Events={report.Events.Count}");
 
+        foreach (var fuelEvent in report.Events)
+        {
+            Console.WriteLine(
+                $"Event: " +
+                $"Id={fuelEvent.Id}, " +
+                $"VehicleId={fuelEvent.VehicleId}, " +
+                $"Type={fuelEvent.Type}, " +
+                $"Volume={fuelEvent.VolumeLiters}, " +
+                $"Start={fuelEvent.StartDate:O}, " +
+                $"End={fuelEvent.EndDate:O}");
+        }
         return new OmnicommFuelingData
         {
             ReportId = report.ReportId,
 
             Events = report.Events
-                .Where(x =>
-                    x.Type == OmnicommFuelEventType.Refuel)
                 .OrderBy(x => x.EventDate)
                 .ToList()
         };

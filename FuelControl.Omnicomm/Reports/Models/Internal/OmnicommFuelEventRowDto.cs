@@ -20,9 +20,15 @@ internal sealed class OmnicommFuelEventRowDto
 
     public int TankNmb { get; init; }
 
-    public double[]? Address { get; init; }
+    /// <summary>
+    /// Адрес события из Omnicomm.
+    /// </summary>
+    public string? Address { get; init; }
 
-    public string? ParseAddress { get; init; }
+    /// <summary>
+    /// Координаты [longitude, latitude].
+    /// </summary>
+    public double[]? Coordinates { get; init; }
 
     public long DriverID { get; init; }
 

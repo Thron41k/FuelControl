@@ -108,6 +108,9 @@ public static class DependencyInjection
         services.AddScoped<
             IOmnicommFuelingMatcher,
             OmnicommFuelingMatcher>();
+        services.AddScoped<
+            IOmnicommFuelingSyncService,
+            OmnicommFuelingSyncService>();
         return services;
     }
 }
