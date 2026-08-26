@@ -71,11 +71,18 @@ public sealed class FuelingUssService(
 
         var attachedEventIds = await dbContext.FuelingUssRecords
             .AsNoTracking()
-            .Where(x => eventIds.Contains(x.OmnicommEventId))
+            .Where(x =>
+                x.OmnicommReportId == report.ReportId &&
+                eventIds.Contains(x.OmnicommEventId))
             .Select(x => x.OmnicommEventId)
             .ToListAsync(cancellationToken);
 
-        return events;
+        var attachedIds =
+            attachedEventIds.ToHashSet();
+
+        return events
+            .Where(x => !attachedIds.Contains(x.Id))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<FuelingUssRecord>> GetByFuelingRecordIdAsync(
@@ -125,8 +132,6 @@ public sealed class FuelingUssService(
                             ?? throw new InvalidOperationException(
                                 "Заправка не найдена.");
 
-        Console.WriteLine(
-            $"FuelingRecord: {fuelingRecord.FuelingDateTime:O}");
         var fuelTruck = await dbContext.FuelTrucks
             .AsNoTracking()
             .Include(x => x.Vehicle)
@@ -190,7 +195,9 @@ public sealed class FuelingUssService(
         var alreadyAttached = await dbContext.FuelingUssRecords
             .AsNoTracking()
             .Where(x =>
-                selectedIds.Contains(x.OmnicommEventId))
+                x.OmnicommReportId == report.ReportId &&
+                selectedIds.Contains(x.OmnicommEventId) &&
+                x.FuelingRecordId != fuelingRecordId)
             .Select(x => new
             {
                 x.OmnicommEventId,

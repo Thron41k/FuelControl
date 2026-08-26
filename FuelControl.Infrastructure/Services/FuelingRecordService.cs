@@ -43,6 +43,7 @@ public sealed class FuelingRecordService(
             .Include(x => x.Vehicle)
             .Include(x => x.Operator)
             .Include(x => x.UssRecords)
+            .Include(x => x.OmnicommRecord)
             .Where(x =>
                 x.FuelingDateTime >= utcStart &&
                 x.FuelingDateTime < utcEnd);
@@ -95,6 +96,7 @@ public sealed class FuelingRecordService(
             .Include(x => x.Vehicle)
             .Include(x => x.Operator)
             .Include(x => x.UssRecords)
+            .Include(x => x.OmnicommRecord)
             .Where(x =>
                 x.FuelingDateTime >= utcStart &&
                 x.FuelingDateTime < utcEnd &&
@@ -115,6 +117,7 @@ public sealed class FuelingRecordService(
             .Include(x => x.Vehicle)
             .Include(x => x.Operator)
             .Include(x => x.UssRecords)
+            .Include(x => x.OmnicommRecord)
             .SingleOrDefaultAsync(
                 x => x.Id == id,
                 cancellationToken);

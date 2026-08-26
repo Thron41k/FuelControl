@@ -14,8 +14,12 @@ public sealed class FuelingUssRecordConfiguration
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.OmnicommEventId)
-            .IsRequired();
+        builder.HasIndex(x => new
+            {
+                x.OmnicommReportId,
+                x.OmnicommEventId
+            })
+            .IsUnique();
 
         builder.Property(x => x.OmnicommReportId)
             .HasMaxLength(200)

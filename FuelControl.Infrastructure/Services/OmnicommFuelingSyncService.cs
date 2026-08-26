@@ -36,7 +36,7 @@ public sealed class OmnicommFuelingSyncService(
         }
 
         // ---------------------------------------------------------
-        // 1. Техника
+        // 1. Получаем технику
         // ---------------------------------------------------------
 
         var vehiclesQuery =
@@ -68,7 +68,7 @@ public sealed class OmnicommFuelingSyncService(
                 .ToList();
 
         // ---------------------------------------------------------
-        // 2. Период
+        // 2. Формируем период
         // ---------------------------------------------------------
 
         var localFrom =
@@ -99,7 +99,7 @@ public sealed class OmnicommFuelingSyncService(
             toOffset.ToUniversalTime();
 
         // ---------------------------------------------------------
-        // 3. Omnicomm
+        // 3. Получаем актуальный отчёт Omnicomm
         // ---------------------------------------------------------
 
         var omnicommData =
@@ -121,7 +121,7 @@ public sealed class OmnicommFuelingSyncService(
         }
 
         // ---------------------------------------------------------
-        // 4. Наши записи заправок
+        // 4. Получаем все наши записи заправок
         // ---------------------------------------------------------
 
         var selectedVehicleIds =
@@ -138,6 +138,7 @@ public sealed class OmnicommFuelingSyncService(
                 .Where(x =>
                     x.FuelingDateTime >= fromUtc &&
                     x.FuelingDateTime < toUtc)
+                .OrderBy(x => x.FuelingDateTime)
                 .ToListAsync(cancellationToken);
 
         if (fuelingRecords.Count == 0)
@@ -151,7 +152,14 @@ public sealed class OmnicommFuelingSyncService(
         }
 
         // ---------------------------------------------------------
-        // 5. Существующие связи
+        // 5. Получаем существующие связи.
+        //
+        // Они нужны только для определения:
+        //   - создать новую связь;
+        //   - обновить существующую.
+        //
+        // НЕЛЬЗЯ использовать OmnicommEventId для определения
+        // соответствия с текущим отчётом.
         // ---------------------------------------------------------
 
         var fuelingRecordIds =
@@ -166,55 +174,36 @@ public sealed class OmnicommFuelingSyncService(
                         x.FuelingRecordId))
                 .ToListAsync(cancellationToken);
 
-        var linksByFuelingRecord =
+        var linksByFuelingRecordId =
             existingLinks
                 .ToDictionary(
                     x => x.FuelingRecordId);
 
         // ---------------------------------------------------------
-        // 6. Сохраняем уже существующие связи
+        // 6. Сопоставляем ВСЕ записи текущего периода
+        // с ВСЕМИ событиями текущего отчёта.
         //
-        // Они считаются подтверждёнными и не должны
-        // быть переопределены другим событием.
+        // OmnicommEventId здесь не используется как идентификатор.
+        // Matcher использует технику + время + объём.
         // ---------------------------------------------------------
-
-        var linkedFuelingRecordIds =
-            existingLinks
-                .Select(x => x.FuelingRecordId)
-                .ToHashSet();
-
-        var linkedOmnicommEventIds =
-            existingLinks
-                .Select(x => x.OmnicommEventId)
-                .ToHashSet();
-
-        // ---------------------------------------------------------
-        // 7. Свободные записи для автоматического сопоставления
-        // ---------------------------------------------------------
-
-        var unmatchedFuelingRecords =
-            fuelingRecords
-                .Where(x =>
-                    !linkedFuelingRecordIds.Contains(x.Id))
-                .ToList();
-
-        var unmatchedOmnicommEvents =
-            omnicommData.Events
-                .Where(x =>
-                    !linkedOmnicommEventIds.Contains(x.Id))
-                .ToList();
 
         var matches =
             matcher.Match(
-                unmatchedFuelingRecords,
-                unmatchedOmnicommEvents);
+                fuelingRecords,
+                omnicommData.Events);
 
-        // ---------------------------------------------------------
-        // 8. Сохраняем новые сопоставления
-        // ---------------------------------------------------------
+        var matchedFuelingRecordIds =
+            new HashSet<Guid>();
+
+        var matchedOmnicommEventIds =
+            new HashSet<int>();
 
         var created = 0;
         var updated = 0;
+
+        // ---------------------------------------------------------
+        // 7. Сохраняем результаты нового сопоставления
+        // ---------------------------------------------------------
 
         foreach (var match in matches)
         {
@@ -226,9 +215,28 @@ public sealed class OmnicommFuelingSyncService(
             var fuelEvent =
                 match.Candidate.Event;
 
-            if (linksByFuelingRecord.ContainsKey(
-                    fuelingRecord.Id))
+            matchedFuelingRecordIds.Add(
+                fuelingRecord.Id);
+
+            matchedOmnicommEventIds.Add(
+                fuelEvent.Id);
+
+            if (linksByFuelingRecordId.TryGetValue(
+                    fuelingRecord.Id,
+                    out var existingLink))
             {
+                existingLink.Update(
+                    fuelEvent.Id,
+                    omnicommData.ReportId,
+                    fuelEvent.VehicleId,
+                    fuelEvent.Name,
+                    fuelEvent.StartDate,
+                    fuelEvent.EndDate,
+                    fuelEvent.VolumeLiters,
+                    matchedBy);
+
+                updated++;
+
                 continue;
             }
 
@@ -247,45 +255,10 @@ public sealed class OmnicommFuelingSyncService(
             dbContext.FuelingOmnicommRecords.Add(
                 entity);
 
-            linksByFuelingRecord[
+            linksByFuelingRecordId[
                 fuelingRecord.Id] = entity;
 
             created++;
-        }
-
-        // ---------------------------------------------------------
-        // 9. Проверяем существующие связи на актуальность.
-        //
-        // Если Omnicomm event всё ещё есть в полученном отчёте,
-        // обновляем его данные, но не меняем сам факт связи.
-        // ---------------------------------------------------------
-
-        var currentEvents =
-            omnicommData.Events
-                .ToDictionary(x => x.Id);
-
-        foreach (var link in existingLinks)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!currentEvents.TryGetValue(
-                    link.OmnicommEventId,
-                    out var fuelEvent))
-            {
-                continue;
-            }
-
-            link.Update(
-                fuelEvent.Id,
-                omnicommData.ReportId,
-                fuelEvent.VehicleId,
-                fuelEvent.Name,
-                fuelEvent.StartDate,
-                fuelEvent.EndDate,
-                fuelEvent.VolumeLiters,
-                matchedBy);
-
-            updated++;
         }
 
         await dbContext.SaveChangesAsync(
