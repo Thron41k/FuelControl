@@ -6,7 +6,7 @@
 @using FuelControl.Infrastructure.Services.Interfaces
 @using System.Security.Claims
 @using FuelControl.Infrastructure.Services.Models
-@using Microsoft.AspNetCore.Components.Authorization
+@using FuelControl.Components.Pages.FuelingRecord.Dialogs
 
 @inject IFuelingRecordService FuelingRecordService
 @inject IVehicleService VehicleService
@@ -37,7 +37,7 @@
 
                 <!-- Дата начала -->
 
-                <div class="col-md-3">
+                <div class="col-md-2">
 
                     <label class="form-label">
                         С
@@ -52,7 +52,7 @@
 
                 <!-- Дата окончания -->
 
-                <div class="col-md-3">
+                <div class="col-md-2">
 
                     <label class="form-label">
                         По
@@ -67,69 +67,241 @@
 
                 <!-- Техника -->
 
-                <div class="col-md-4">
+                <div class="col-md">
 
                     <label class="form-label">
                         Техника
                     </label>
 
-                    <select class="form-select"
-                            @bind="_selectedVehicleId">
+                    <div class="input-group">
 
-                        <option value="">
-                            Вся техника
-                        </option>
+                        <input class="form-control"
+                               readonly
+                               value="@GetSelectedVehicleName()"
+                               placeholder="Выберите технику" />
 
-                        @foreach (var vehicle in _vehicles)
-                        {
-                            <option value="@vehicle.Id">
-                                @vehicle.Name
-                            </option>
-                        }
+                        <button type="button"
+                                class="btn btn-outline-primary"
+                                @onclick="OpenVehicleDialog">
 
-                    </select>
+                            <i class="bi bi-search me-1"></i>
+                            Выбрать
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Действия -->
+
+                <div class="col-md-auto">
+
+                    <div class="d-flex justify-content-end gap-2">
+
+                        <button type="button"
+                                class="btn btn-primary"
+                                disabled="@(_loading || !_selectedVehicleId.HasValue)"
+                                @onclick="LoadRecords">
+
+                            @if (_loading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+
+                            Показать
+
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-primary"
+                                disabled="@(_loading
+                                                                                                      || !_loaded
+                                                                                                      || _syncing
+                                                                                                      || !_selectedVehicleId.HasValue)"
+                                @onclick="SyncOmnicomm">
+
+                            @if (_syncing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-arrow-repeat me-1"></i>
+                            }
+
+                            Обновить данные Omnicomm
+
+                        </button>
+
+                    </div>
 
                 </div>
 
-
-                <!-- Кнопка -->
-
-                <div class="col-md-2">
-
-                    <button type="button"
-                            class="btn btn-primary w-100"
-                            disabled="@_loading"
-                            @onclick="LoadRecords">
-
-                        @if (_loading)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2">
-                            </span>
-                        }
-
-                        Показать
-
-                    </button>
-
-                </div>
-                <button type="button"
-                        class="btn btn-outline-primary"
-                        disabled="@(_loading || !_loaded || _syncing)"
-                        @onclick="SyncOmnicomm">
-    
-                    @if (_syncing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-
-                    Обновить данные Omnicomm
-                </button>
             </div>
 
         </div>
 
     </div>
+    @if (_loaded)
+    {
+        <div class="row g-3 mb-3">
 
+            <!-- Ведомость -->
+
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+
+                        <div class="d-flex justify-content-between gap-4">
+
+                            <div>
+                                <div class="text-muted small mb-1">
+                                    Объём по ведомости
+                                </div>
+
+                                <div class="fs-4 fw-semibold">
+                                    @FormatVolume(GetStatementVolume())
+                                </div>
+                            </div>
+
+                            <div class="text-end small">
+
+                                <div class="text-muted mb-1">
+                                    Расхождение
+                                </div>
+
+                                <div>
+                                    с УСС:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetStatementVsUssDifferencePercent())">
+                                        @FormatDifference(
+                                            GetStatementVsUssDifferencePercent())
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    с Omnicomm:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetStatementVsOmnicommDifferencePercent())">
+                                        @FormatDifference(
+                                            GetStatementVsOmnicommDifferencePercent())
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- УСС -->
+
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+
+                        <div class="d-flex justify-content-between gap-4">
+
+                            <div>
+                                <div class="text-muted small mb-1">
+                                    Объём по УСС
+                                </div>
+
+                                <div class="fs-4 fw-semibold">
+                                    @FormatVolume(GetUssVolume())
+                                </div>
+                            </div>
+
+                            <div class="text-end small">
+
+                                <div class="text-muted mb-1">
+                                    Расхождение
+                                </div>
+
+                                <div>
+                                    с ведомостью:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetUssVsStatementDifferencePercent())">
+                                        @FormatDifference(
+                                            GetUssVsStatementDifferencePercent())
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    с Omnicomm:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetUssVsOmnicommDifferencePercent())">
+                                        @FormatDifference(
+                                            GetUssVsOmnicommDifferencePercent())
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Omnicomm -->
+
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+
+                        <div class="d-flex justify-content-between gap-4">
+
+                            <div>
+                                <div class="text-muted small mb-1">
+                                    Объём по Omnicomm
+                                </div>
+
+                                <div class="fs-4 fw-semibold">
+                                    @FormatVolume(GetOmnicommVolume())
+                                </div>
+                            </div>
+
+                            <div class="text-end small">
+
+                                <div class="text-muted mb-1">
+                                    Расхождение
+                                </div>
+
+                                <div>
+                                    с ведомостью:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetOmnicommVsStatementDifferencePercent())">
+                                        @FormatDifference(
+                                            GetOmnicommVsStatementDifferencePercent())
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    с УСС:
+                                    <strong class="@GetDifferenceClass(
+                                                                                GetOmnicommVsUssDifferencePercent())">
+                                        @FormatDifference(
+                                            GetOmnicommVsUssDifferencePercent())
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
 
     <!-- Ошибка -->
     @if (!string.IsNullOrWhiteSpace(_errorMessage))
@@ -139,19 +311,6 @@
         </div>
     }
 
-    @if (_lastSyncResult is not null && string.IsNullOrWhiteSpace(_errorMessage))
-    {
-        <div class="alert alert-info">
-            Обработано заправок:
-            <strong>@_lastSyncResult.FuelingRecordsCount</strong>,
-            событий Omnicomm:
-            <strong>@_lastSyncResult.OmnicommEventsCount</strong>,
-            создано связей:
-            <strong>@_lastSyncResult.CreatedCount</strong>,
-            обновлено:
-            <strong>@_lastSyncResult.UpdatedCount</strong>.
-        </div>
-    }
     <!-- Загрузка -->
     @if (_loading)
     {
@@ -214,10 +373,10 @@
                                     </th>
 
                                     <th>
-                                        УСС
+                                        УСС, л
                                     </th>
                                     <th>
-                                        Omnicomm
+                                        Omnicomm, л
                                     </th>
                                 </tr>
 
@@ -262,12 +421,12 @@
                                         <td>
                                             @if (record.OmnicommRecord is null)
                                             {
-                                                <span class="text-muted">—</span>
+                                                <span>—</span>
                                             }
                                             else
                                             {
-                                                <span class="text-success">
-                                                    @record.OmnicommRecord.VolumeLiters.ToString("0.###") л
+                                                <span>
+                                                    @record.OmnicommRecord.VolumeLiters.ToString("0.###")
                                                 </span>
                                             }
                                         </td>
@@ -287,13 +446,56 @@
     }
 
 </div>
+
+<VehicleSelectDialog Visible="@_showVehicleDialog"
+                     Vehicles="@_vehicles"
+                     SelectedVehicleId="@_dialogVehicleId"
+                     OnSelected="@OnVehicleSelected"
+                     OnClosed="@CloseVehicleDialog" />
+
 @if (!_timeZoneLoaded && string.IsNullOrWhiteSpace(_errorMessage))
 {
     <div class="alert alert-info">
         Загрузка...
     </div>
 }
+@if (_showSyncToast && _lastSyncResult is not null)
+{
+    <div class="fueling-sync-toast"
+         role="status"
+         aria-live="polite"
+         aria-atomic="true">
 
+        <div class="fueling-sync-toast-icon">
+            <i class="bi bi-check-lg"></i>
+        </div>
+
+        <div class="fueling-sync-toast-content">
+            <div class="fueling-sync-toast-title">
+                Данные Omnicomm обновлены
+            </div>
+
+            <div class="fueling-sync-toast-text">
+                Заправок:
+                <strong>@_lastSyncResult.FuelingRecordsCount</strong>
+                · Событий:
+                <strong>@_lastSyncResult.OmnicommEventsCount</strong>
+                · Создано:
+                <strong>@_lastSyncResult.CreatedCount</strong>
+                · Обновлено:
+                <strong>@_lastSyncResult.UpdatedCount</strong>
+            </div>
+        </div>
+
+        <button type="button"
+                class="fueling-sync-toast-close"
+                aria-label="Закрыть"
+                @onclick="HideSyncToast">
+            <i class="bi bi-x"></i>
+        </button>
+
+    </div>
+}
 @code {
 
     private DateOnly _fromDate;
@@ -301,6 +503,9 @@
     private DateOnly _toDate;
 
     private Guid? _selectedVehicleId;
+    private bool _showVehicleDialog;
+
+    private Guid? _dialogVehicleId;
 
     private IReadOnlyList<Vehicle> _vehicles = [];
 
@@ -318,6 +523,9 @@
 
     private bool _syncing;
     private FuelingOmnicommSyncResult? _lastSyncResult;
+    private bool _showSyncToast;
+
+    private int _toastVersion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -369,6 +577,30 @@
         }
     }
 
+    private async Task ShowSyncToastAsync()
+    {
+        var version = ++_toastVersion;
+
+        _showSyncToast = true;
+
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(
+            TimeSpan.FromSeconds(4));
+
+        if (version != _toastVersion)
+            return;
+
+        _showSyncToast = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void HideSyncToast()
+    {
+        _toastVersion++;
+        _showSyncToast = false;
+    }
 
     private async Task LoadRecords()
     {
@@ -376,6 +608,14 @@
         {
             _errorMessage =
                 "Часовой пояс пользователя ещё не определён.";
+
+            return;
+        }
+
+        if (!_selectedVehicleId.HasValue)
+        {
+            _errorMessage =
+                "Необходимо выбрать технику.";
 
             return;
         }
@@ -440,8 +680,8 @@
                 x => x.VolumeLiters);
 
         return count == 1
-            ? $"{volume:0.###} л"
-            : $"{count} записи, {volume:0.###} л";
+            ? $"{volume:0.###}"
+            : $"{count} записи, {volume:0.###}";
     }
 
     private async Task SyncOmnicomm()
@@ -450,6 +690,14 @@
         {
             _errorMessage =
                 "Часовой пояс пользователя ещё не определён.";
+
+            return;
+        }
+
+        if (!_selectedVehicleId.HasValue)
+        {
+            _errorMessage =
+                "Необходимо выбрать технику.";
 
             return;
         }
@@ -464,6 +712,7 @@
 
         _syncing = true;
         _errorMessage = null;
+        _lastSyncResult = null;
 
         try
         {
@@ -473,9 +722,12 @@
 
             var userId =
                 authenticationState.User
-                    .FindFirstValue(ClaimTypes.NameIdentifier);
+                    .FindFirstValue(
+                        ClaimTypes.NameIdentifier);
 
-            if (!Guid.TryParse(userId, out var matchedBy))
+            if (!Guid.TryParse(
+                    userId,
+                    out var matchedBy))
             {
                 throw new InvalidOperationException(
                     "Не удалось определить текущего пользователя.");
@@ -493,6 +745,8 @@
         }
         catch (Exception ex)
         {
+            _lastSyncResult = null;
+
             _errorMessage =
                 $"Не удалось обновить данные Omnicomm: {ex.Message}";
         }
@@ -500,5 +754,139 @@
         {
             _syncing = false;
         }
+
+        // Toast запускаем только после завершения операции.
+        if (_lastSyncResult is not null &&
+            string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            await ShowSyncToastAsync();
+        }
+    }
+
+    private void OpenVehicleDialog()
+    {
+        _dialogVehicleId = _selectedVehicleId;
+        _showVehicleDialog = true;
+    }
+
+    private void CloseVehicleDialog()
+    {
+        _showVehicleDialog = false;
+    }
+
+    private void OnVehicleSelected(Guid id)
+    {
+        _selectedVehicleId = id;
+        _dialogVehicleId = id;
+        _showVehicleDialog = false;
+    }
+
+    private string GetSelectedVehicleName()
+    {
+        if (!_selectedVehicleId.HasValue)
+            return string.Empty;
+
+        return _vehicles
+                   .FirstOrDefault(x =>
+                       x.Id == _selectedVehicleId.Value)
+                   ?.Name
+               ?? string.Empty;
+    }
+
+    private static decimal CalculateDifferencePercent(
+        decimal value,
+        decimal reference)
+    {
+        if (reference == 0)
+            return 0;
+
+        return (value - reference)
+               / reference
+               * 100m;
+    }
+
+    private decimal GetStatementVolume()
+    {
+        return _records.Sum(
+            x => (decimal)x.Volume);
+    }
+
+    private decimal GetUssVolume()
+    {
+        return _records.Sum(
+            x => x.UssRecords.Sum(
+                uss => uss.VolumeLiters));
+    }
+
+    private decimal GetOmnicommVolume()
+    {
+        return _records
+            .Where(x => x.OmnicommRecord is not null)
+            .Sum(x => x.OmnicommRecord!.VolumeLiters);
+    }
+
+    private decimal GetStatementVsUssDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetStatementVolume(),
+            GetUssVolume());
+    }
+
+    private decimal GetStatementVsOmnicommDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetStatementVolume(),
+            GetOmnicommVolume());
+    }
+
+    private decimal GetUssVsStatementDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetUssVolume(),
+            GetStatementVolume());
+    }
+
+    private decimal GetUssVsOmnicommDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetUssVolume(),
+            GetOmnicommVolume());
+    }
+
+    private decimal GetOmnicommVsStatementDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetOmnicommVolume(),
+            GetStatementVolume());
+    }
+
+    private decimal GetOmnicommVsUssDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetOmnicommVolume(),
+            GetUssVolume());
+    }
+
+    private static string FormatVolume(
+        decimal volume)
+    {
+        return $"{volume:N1} л";
+    }
+
+    private static string FormatDifference(
+        decimal difference)
+    {
+        if (difference == 0)
+            return "0,00%";
+
+        return difference > 0
+            ? $"+{difference:N2}%"
+            : $"{difference:N2}%";
+    }
+
+    private static string GetDifferenceClass(
+        decimal difference)
+    {
+        return Math.Abs(difference) > 2.5m ? "text-danger" : "text-success";
     }
 }
