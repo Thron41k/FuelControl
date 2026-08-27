@@ -8,11 +8,20 @@ public sealed class FuelTruck
 
     public Vehicle Vehicle { get; private set; } = null!;
 
-    public ICollection<FuelTruckOmnicommBinding> OmnicommBindings
-    {
-        get;
-        private set;
-    } = new List<FuelTruckOmnicommBinding>();
+    /// <summary>
+    /// Техника Omnicomm, используемая для получения показаний УСС.
+    /// </summary>
+    public Guid? UssVehicleId { get; private set; }
+
+    public Vehicle? UssVehicle { get; private set; }
+
+    /// <summary>
+    /// Техника Omnicomm, используемая для получения
+    /// остатка топлива в ёмкости АТЗ.
+    /// </summary>
+    public Guid? TankVehicleId { get; private set; }
+
+    public Vehicle? TankVehicle { get; private set; }
 
     private FuelTruck()
     {
@@ -41,5 +50,15 @@ public sealed class FuelTruck
         }
 
         VehicleId = vehicleId;
+    }
+
+    public void SetUssVehicle(Guid? vehicleId)
+    {
+        UssVehicleId = vehicleId;
+    }
+
+    public void SetTankVehicle(Guid? vehicleId)
+    {
+        TankVehicleId = vehicleId;
     }
 }

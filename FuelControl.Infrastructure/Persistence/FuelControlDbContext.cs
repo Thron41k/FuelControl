@@ -9,6 +9,7 @@ namespace FuelControl.Infrastructure.Persistence;
 public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
+    public DbSet<Branch> Branchs => Set<Branch>();
     public DbSet<FuelTruck> FuelTrucks => Set<FuelTruck>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Operator> Operators => Set<Operator>();

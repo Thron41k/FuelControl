@@ -22,6 +22,8 @@ public sealed class FuelTruckService(
             .AsNoTracking()
             .Include(x => x.Vehicle)
             .ThenInclude(x => x.Branch)
+            .Include(x => x.UssVehicle)
+            .Include(x => x.TankVehicle)
             .OrderBy(x => x.Vehicle.Name)
             .ToListAsync(cancellationToken);
     }
@@ -188,6 +190,73 @@ public sealed class FuelTruckService(
             throw new UnauthorizedAccessException(
                 "Только администратор может управлять " +
                 "топливозаправщиками.");
+        }
+    }
+
+    public async Task SetOmnicommVehiclesAsync(
+        Guid fuelTruckId,
+        Guid? ussVehicleId,
+        Guid? tankVehicleId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAdminAsync();
+
+        var fuelTruck =
+            await dbContext.FuelTrucks
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelTruckId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Топливозаправщик не найден.");
+
+        await ValidateOmnicommVehicleAsync(
+            ussVehicleId,
+            "УСС",
+            cancellationToken);
+
+        await ValidateOmnicommVehicleAsync(
+            tankVehicleId,
+            "емкости",
+            cancellationToken);
+
+        fuelTruck.SetUssVehicle(
+            ussVehicleId);
+
+        fuelTruck.SetTankVehicle(
+            tankVehicleId);
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    private async Task ValidateOmnicommVehicleAsync(
+        Guid? vehicleId,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        if (!vehicleId.HasValue)
+            return;
+
+        var vehicle =
+            await dbContext.Vehicles
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.Id == vehicleId.Value &&
+                         x.IsActive,
+                    cancellationToken);
+
+        if (vehicle is null)
+        {
+            throw new InvalidOperationException(
+                $"Техника для назначения «{purpose}» не найдена " +
+                "или неактивна.");
+        }
+
+        if (vehicle.OmnicommObjectId is null)
+        {
+            throw new InvalidOperationException(
+                $"У выбранной техники для назначения «{purpose}» " +
+                "не указан OmnicommObjectId.");
         }
     }
 }

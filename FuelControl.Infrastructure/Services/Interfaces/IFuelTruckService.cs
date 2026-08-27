@@ -19,6 +19,12 @@ public interface IFuelTruckService
         Guid vehicleId,
         CancellationToken cancellationToken = default);
 
+    Task SetOmnicommVehiclesAsync(
+        Guid fuelTruckId,
+        Guid? ussVehicleId,
+        Guid? tankVehicleId,
+        CancellationToken cancellationToken = default);
+
     Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default);

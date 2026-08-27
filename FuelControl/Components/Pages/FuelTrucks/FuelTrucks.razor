@@ -1,12 +1,15 @@
 ﻿@page "/fuel-trucks"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = Roles.Admin)]
+
+@using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
 @using Microsoft.AspNetCore.Authorization
 
 @inject IFuelTruckService FuelTruckVehicleService
+@inject IVehicleService VehicleService
 
 <PageTitle>Топливозаправщики</PageTitle>
 
@@ -124,7 +127,11 @@
                                 </th>
 
                                 <th>
-                                    OmnicommId
+                                    Емкость Omnicomm
+                                </th>
+
+                                <th>
+                                    УСС Omnicomm
                                 </th>
 
                                 <th>
@@ -156,7 +163,43 @@
                                     </td>
 
                                     <td>
-                                        @(fuelTruck.Vehicle.OmnicommObjectId?.ToString() ?? "—")
+                                        @if (fuelTruck.TankVehicle?.OmnicommObjectId
+                                            is { } tankOmnicommId)
+                                        {
+                                            <div class="fw-semibold">
+                                                @tankOmnicommId
+                                            </div>
+
+                                            <div class="small text-muted">
+                                                @fuelTruck.TankVehicle.Name
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">
+                                                —
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        @if (fuelTruck.UssVehicle?.OmnicommObjectId
+                                            is { } ussOmnicommId)
+                                        {
+                                            <div class="fw-semibold">
+                                                @ussOmnicommId
+                                            </div>
+
+                                            <div class="small text-muted">
+                                                @fuelTruck.UssVehicle.Name
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">
+                                                —
+                                            </span>
+                                        }
                                     </td>
 
                                     <td>
@@ -167,24 +210,32 @@
 
                                         <div class="btn-group">
 
-                                            <button class="btn btn-sm btn-outline-primary"
-                                                    @onclick="() => EditFuelTruck(fuelTruck.Id)">
-                                                <span class="bi bi-pencil"></span>
-                                                Изменить
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    @onclick="() => OpenOmnicommSettings(fuelTruck)">
+
+                                                <span class="bi bi-gear"></span>
+                                                Настроить
+
                                             </button>
-                                                <AuthorizeView Roles="@Roles.Admin">
-                                                    <ChildContent Context="adminContext">
 
-                                                        <button class="btn btn-sm btn-outline-danger"
-                                                                @onclick="() => ConfirmDelete(fuelTruck.Id)">
+                                            <AuthorizeView Roles="@Roles.Admin">
 
-                                                            <span class="bi bi-trash"></span>
-                                                            Удалить
+                                                <ChildContent Context="adminContext">
 
-                                                        </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => ConfirmDelete(fuelTruck.Id)">
 
-                                                    </ChildContent>
-                                                </AuthorizeView>
+                                                        <span class="bi bi-trash"></span>
+                                                        Удалить
+
+                                                    </button>
+
+                                                </ChildContent>
+
+                                            </AuthorizeView>
+
                                         </div>
 
                                     </td>
@@ -205,6 +256,10 @@
 
 </div>
 
+
+@* ================================================================
+   Диалог добавления / редактирования АТЗ
+   ================================================================ *@
 
 @if (ShowDialog)
 {
@@ -358,27 +413,217 @@
                     </div>
 
 
+                    <div class="modal-footer">
+
+                        <button type="button"
+                                class="btn btn-secondary"
+                                @onclick="CloseDialog"
+                                disabled="@IsSaving">
+
+                            Отмена
+
+                        </button>
+
+
+                        <button type="button"
+                                class="btn btn-primary"
+                                @onclick="SaveFuelTruck"
+                                disabled="@(!CanSave)">
+
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"
+                                      role="status">
+                                </span>
+                            }
+
+                            Сохранить
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+@* ================================================================
+   Диалог настройки Omnicomm
+   ================================================================ *@
+
+@if (ShowOmnicommSettings)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0, 0, 0, 0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Настройка Omnicomm
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseOmnicommSettings"
+                            disabled="@IsSavingOmnicomm">
+                    </button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    @if (_editingFuelTruck is not null)
+                    {
+                        <div class="mb-3">
+
+                            <div class="text-muted small">
+                                Топливозаправщик
+                            </div>
+
+                            <div class="fw-semibold">
+                                @_editingFuelTruck.Vehicle.Name
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(
+                                _editingFuelTruck.Vehicle.RegistrationNumber))
+                            {
+                                <div class="small text-muted">
+                                    @_editingFuelTruck.Vehicle.RegistrationNumber
+                                </div>
+                            }
+
+                        </div>
+                    }
+
+
+                    @if (!string.IsNullOrWhiteSpace(
+                        OmnicommSettingsErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @OmnicommSettingsErrorMessage
+                        </div>
+                    }
+
+
+                    @* ------------------------------------------------
+                       Емкость
+                       ------------------------------------------------ *@
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+                            Емкость Omnicomm
+                        </label>
+
+                        <div class="input-group">
+
+                            <input class="form-control"
+                                   readonly
+                                   value="@GetVehicleDisplay(_tankVehicleId)"
+                                   placeholder="Не назначена" />
+
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    @onclick="() => OpenVehicleSelection(
+                                        OmnicommSelectionType.Tank)"
+                                    disabled="@IsSavingOmnicomm">
+
+                                <span class="bi bi-search me-1"></span>
+                                Выбрать
+
+                            </button>
+
+                        </div>
+
+                        @if (_tankVehicleId.HasValue)
+                        {
+                            <div class="form-text">
+                                OmnicommId:
+                                <strong>
+                                    @GetOmnicommId(_tankVehicleId)
+                                </strong>
+                            </div>
+                        }
+
+                    </div>
+
+
+                    @* ------------------------------------------------
+                       УСС
+                       ------------------------------------------------ *@
+
+                    <div>
+
+                        <label class="form-label">
+                            УСС Omnicomm
+                        </label>
+
+                        <div class="input-group">
+
+                            <input class="form-control"
+                                   readonly
+                                   value="@GetVehicleDisplay(_ussVehicleId)"
+                                   placeholder="Не назначена" />
+
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    @onclick="() => OpenVehicleSelection(
+                                        OmnicommSelectionType.Uss)"
+                                    disabled="@IsSavingOmnicomm">
+
+                                <span class="bi bi-search me-1"></span>
+                                Выбрать
+
+                            </button>
+
+                        </div>
+
+                        @if (_ussVehicleId.HasValue)
+                        {
+                            <div class="form-text">
+                                OmnicommId:
+                                <strong>
+                                    @GetOmnicommId(_ussVehicleId)
+                                </strong>
+                            </div>
+                        }
+
+                    </div>
+
+                </div>
+
+
                 <div class="modal-footer">
 
                     <button type="button"
                             class="btn btn-secondary"
-                            @onclick="CloseDialog"
-                            disabled="@IsSaving">
+                            @onclick="CloseOmnicommSettings"
+                            disabled="@IsSavingOmnicomm">
 
                         Отмена
 
                     </button>
 
-
                     <button type="button"
                             class="btn btn-primary"
-                            @onclick="SaveFuelTruck"
-                            disabled="@(!CanSave)">
+                            @onclick="SaveOmnicommSettings"
+                            disabled="@IsSavingOmnicomm">
 
-                        @if (IsSaving)
+                        @if (IsSavingOmnicomm)
                         {
-                            <span class="spinner-border spinner-border-sm me-1"
-                                  role="status">
+                            <span class="spinner-border spinner-border-sm me-1">
                             </span>
                         }
 
@@ -392,10 +637,25 @@
 
         </div>
 
-        </div>
     </div>
 }
 
+
+@* ================================================================
+   Существующий VehicleSelectDialog
+   ================================================================ *@
+
+<VehicleSelectDialog
+    Visible="@ShowVehicleSelectionDialog"
+    Vehicles="@OmnicommVehicles"
+    SelectedVehicleId="@GetCurrentSelectionId()"
+    OnSelected="@OnVehicleSelected"
+    OnClosed="@CloseVehicleSelection" />
+
+
+@* ================================================================
+   Диалог удаления
+   ================================================================ *@
 
 @if (FuelTruckToDelete is not null)
 {
@@ -484,23 +744,48 @@
         AvailableVehicles
             .Where(MatchesVehicleSearch)
             .OrderBy(x => x.Name);
+
     private IReadOnlyList<FuelTruck> FuelTruckList = [];
+
     private IReadOnlyList<Vehicle> AvailableVehicles = [];
+
+    private IReadOnlyList<Vehicle> OmnicommVehicles = [];
 
     private string SearchText = string.Empty;
 
     private Guid? SelectedVehicleId;
+
     private Guid? EditingFuelTruckId;
 
     private FuelTruck? FuelTruckToDelete;
 
+    private FuelTruck? _editingFuelTruck;
+
+    private Guid? _ussVehicleId;
+
+    private Guid? _tankVehicleId;
+
     private bool IsLoading;
+
     private bool IsSaving;
+
     private bool IsDeleting;
+
     private bool ShowDialog;
 
+    private bool ShowOmnicommSettings;
+
+    private bool ShowVehicleSelectionDialog;
+
+    private bool IsSavingOmnicomm;
+
+    private OmnicommSelectionType _selectionType;
+
     private string? ErrorMessage;
+
     private string? DialogErrorMessage;
+
+    private string? OmnicommSettingsErrorMessage;
 
 
     private bool CanSave =>
@@ -512,6 +797,13 @@
         FuelTruckList
             .Where(MatchesSearch)
             .OrderBy(x => x.Vehicle.Name);
+
+
+    private enum OmnicommSelectionType
+    {
+        Uss,
+        Tank
+    }
 
 
     protected override async Task OnInitializedAsync()
@@ -528,7 +820,8 @@
         try
         {
             FuelTruckList =
-                await FuelTruckVehicleService.GetAllAsync();
+                await FuelTruckVehicleService
+                    .GetAllAsync();
         }
         catch (Exception ex)
         {
@@ -540,7 +833,9 @@
         }
     }
 
-    private async Task SelectVehicleAndSave(Vehicle vehicle)
+
+    private async Task SelectVehicleAndSave(
+        Vehicle vehicle)
     {
         if (IsSaving)
         {
@@ -552,14 +847,18 @@
         await SaveFuelTruck();
     }
 
-    private bool MatchesVehicleSearch(Vehicle vehicle)
+
+    private bool MatchesVehicleSearch(
+        Vehicle vehicle)
     {
-        if (string.IsNullOrWhiteSpace(VehicleSearchText))
+        if (string.IsNullOrWhiteSpace(
+                VehicleSearchText))
         {
             return true;
         }
 
-        var search = VehicleSearchText.Trim();
+        var search =
+            VehicleSearchText.Trim();
 
         return
             vehicle.Name.Contains(
@@ -583,10 +882,13 @@
             );
     }
 
-    private void SelectVehicle(Vehicle vehicle)
+
+    private void SelectVehicle(
+        Vehicle vehicle)
     {
         SelectedVehicleId = vehicle.Id;
     }
+
 
     private bool MatchesSearch(
         FuelTruck fuelTruck)
@@ -596,7 +898,8 @@
             return true;
         }
 
-        var search = SearchText.Trim();
+        var search =
+            SearchText.Trim();
 
         return
             fuelTruck.Vehicle.Name.Contains(
@@ -618,34 +921,25 @@
                         search,
                         StringComparison.OrdinalIgnoreCase)
                 ?? false
+            )
+            ||
+            (
+                fuelTruck.UssVehicle?.OmnicommObjectId
+                    ?.ToString()
+                    .Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                ?? false
+            )
+            ||
+            (
+                fuelTruck.TankVehicle?.OmnicommObjectId
+                    ?.ToString()
+                    .Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                ?? false
             );
-    }
-
-
-    private string GetVehicleDescription(
-        Vehicle vehicle)
-    {
-        var values = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(
-                vehicle.RegistrationNumber))
-        {
-            values.Add(
-                vehicle.RegistrationNumber);
-        }
-
-        if (vehicle.OmnicommObjectId.HasValue)
-        {
-            values.Add(
-                $"OmnicommId: {vehicle.OmnicommObjectId.Value}");
-        }
-
-        if (values.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        return $" — {string.Join(", ", values)}";
     }
 
 
@@ -654,6 +948,7 @@
         EditingFuelTruckId = null;
 
         SelectedVehicleId = null;
+
         VehicleSearchText = string.Empty;
 
         DialogErrorMessage = null;
@@ -673,22 +968,29 @@
     }
 
 
-    private async Task EditFuelTruck(Guid id)
+    private async Task EditFuelTruck(
+        Guid id)
     {
-        var fuelTruck = FuelTruckList
-            .FirstOrDefault(x => x.Id == id);
+        var fuelTruck =
+            FuelTruckList
+                .FirstOrDefault(x => x.Id == id);
 
         if (fuelTruck is null)
         {
             return;
         }
 
-        EditingFuelTruckId = fuelTruck.Id;
+        EditingFuelTruckId =
+            fuelTruck.Id;
 
-        SelectedVehicleId = fuelTruck.VehicleId;
-        VehicleSearchText = string.Empty;
+        SelectedVehicleId =
+            fuelTruck.VehicleId;
 
-        DialogErrorMessage = null;
+        VehicleSearchText =
+            string.Empty;
+
+        DialogErrorMessage =
+            null;
 
         try
         {
@@ -697,14 +999,15 @@
                     .GetAvailableVehiclesAsync();
 
             // При редактировании текущая техника
-            // должна остаться в списке.
+            // должна остаться доступной.
             if (AvailableVehicles.All(
                     x => x.Id != fuelTruck.VehicleId))
             {
-                AvailableVehicles = AvailableVehicles
-                    .Append(fuelTruck.Vehicle)
-                    .OrderBy(x => x.Name)
-                    .ToList();
+                AvailableVehicles =
+                    AvailableVehicles
+                        .Append(fuelTruck.Vehicle)
+                        .OrderBy(x => x.Name)
+                        .ToList();
             }
 
             ShowDialog = true;
@@ -728,7 +1031,8 @@
         EditingFuelTruckId = null;
         SelectedVehicleId = null;
 
-        VehicleSearchText = string.Empty;
+        VehicleSearchText =
+            string.Empty;
 
         AvailableVehicles = [];
 
@@ -753,27 +1057,31 @@
         {
             if (EditingFuelTruckId is null)
             {
-                await FuelTruckVehicleService.CreateAsync(
-                    SelectedVehicleId.Value);
+                await FuelTruckVehicleService
+                    .CreateAsync(
+                        SelectedVehicleId.Value);
             }
             else
             {
-                await FuelTruckVehicleService.UpdateAsync(
-                    EditingFuelTruckId.Value,
-                    SelectedVehicleId.Value);
+                await FuelTruckVehicleService
+                    .UpdateAsync(
+                        EditingFuelTruckId.Value,
+                        SelectedVehicleId.Value);
             }
 
             ShowDialog = false;
 
             EditingFuelTruckId = null;
             SelectedVehicleId = null;
+
             AvailableVehicles = [];
 
             await LoadFuelTrucksAsync();
         }
         catch (Exception ex)
         {
-            DialogErrorMessage = ex.Message;
+            DialogErrorMessage =
+                ex.Message;
         }
         finally
         {
@@ -782,11 +1090,196 @@
     }
 
 
-    private void ConfirmDelete(Guid id)
+    private async Task OpenOmnicommSettings(
+        FuelTruck fuelTruck)
+    {
+        _editingFuelTruck =
+            fuelTruck;
+
+        _ussVehicleId =
+            fuelTruck.UssVehicleId;
+
+        _tankVehicleId =
+            fuelTruck.TankVehicleId;
+
+        OmnicommSettingsErrorMessage =
+            null;
+
+        try
+        {
+            var vehicles =
+                await VehicleService.GetAllAsync();
+
+            OmnicommVehicles =
+                vehicles
+                    .Where(x =>
+                        x.IsActive &&
+                        x.OmnicommObjectId.HasValue)
+                    .OrderBy(x => x.Name)
+                    .ToList();
+
+            ShowOmnicommSettings = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage =
+                ex.Message;
+        }
+    }
+
+
+    private void CloseOmnicommSettings()
+    {
+        if (IsSavingOmnicomm)
+        {
+            return;
+        }
+
+        ShowOmnicommSettings = false;
+
+        _editingFuelTruck = null;
+
+        _ussVehicleId = null;
+        _tankVehicleId = null;
+
+        OmnicommVehicles = [];
+
+        OmnicommSettingsErrorMessage = null;
+    }
+
+
+    private void OpenVehicleSelection(
+        OmnicommSelectionType selectionType)
+    {
+        _selectionType =
+            selectionType;
+
+        ShowVehicleSelectionDialog = true;
+    }
+
+
+    private Guid? GetCurrentSelectionId()
+    {
+        return _selectionType switch
+        {
+            OmnicommSelectionType.Uss =>
+                _ussVehicleId,
+
+            OmnicommSelectionType.Tank =>
+                _tankVehicleId,
+
+            _ => null
+        };
+    }
+
+
+    private void OnVehicleSelected(
+        Guid vehicleId)
+    {
+        switch (_selectionType)
+        {
+            case OmnicommSelectionType.Uss:
+                _ussVehicleId =
+                    vehicleId;
+                break;
+
+            case OmnicommSelectionType.Tank:
+                _tankVehicleId =
+                    vehicleId;
+                break;
+        }
+
+        ShowVehicleSelectionDialog = false;
+    }
+
+
+    private void CloseVehicleSelection()
+    {
+        ShowVehicleSelectionDialog = false;
+    }
+
+
+    private async Task SaveOmnicommSettings()
+    {
+        if (_editingFuelTruck is null)
+        {
+            return;
+        }
+
+        IsSavingOmnicomm = true;
+
+        OmnicommSettingsErrorMessage =
+            null;
+
+        try
+        {
+            await FuelTruckVehicleService
+                .SetOmnicommVehiclesAsync(
+                    _editingFuelTruck.Id,
+                    _ussVehicleId,
+                    _tankVehicleId);
+
+            await LoadFuelTrucksAsync();
+
+            ShowOmnicommSettings = false;
+
+            _editingFuelTruck = null;
+
+            _ussVehicleId = null;
+            _tankVehicleId = null;
+
+            OmnicommVehicles = [];
+        }
+        catch (Exception ex)
+        {
+            OmnicommSettingsErrorMessage =
+                ex.Message;
+        }
+        finally
+        {
+            IsSavingOmnicomm = false;
+        }
+    }
+
+
+    private string GetVehicleDisplay(
+        Guid? vehicleId)
+    {
+        if (!vehicleId.HasValue)
+        {
+            return string.Empty;
+        }
+
+        return OmnicommVehicles
+            .FirstOrDefault(
+                x => x.Id == vehicleId.Value)
+            ?.Name
+            ?? "Техника не найдена";
+    }
+
+
+    private long? GetOmnicommId(
+        Guid? vehicleId)
+    {
+        if (!vehicleId.HasValue)
+        {
+            return null;
+        }
+
+        return OmnicommVehicles
+            .FirstOrDefault(
+                x => x.Id == vehicleId.Value)
+            ?.OmnicommObjectId;
+    }
+
+
+    private void ConfirmDelete(
+        Guid id)
     {
         FuelTruckToDelete =
-            FuelTruckList.FirstOrDefault(
-                x => x.Id == id);
+            FuelTruckList
+                .FirstOrDefault(
+                    x => x.Id == id);
     }
 
 
@@ -808,14 +1301,16 @@
             return;
         }
 
-        var id = FuelTruckToDelete.Id;
+        var id =
+            FuelTruckToDelete.Id;
 
         IsDeleting = true;
         ErrorMessage = null;
 
         try
         {
-            await FuelTruckVehicleService.DeleteAsync(id);
+            await FuelTruckVehicleService
+                .DeleteAsync(id);
 
             FuelTruckToDelete = null;
 
@@ -823,7 +1318,8 @@
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            ErrorMessage =
+                ex.Message;
         }
         finally
         {
