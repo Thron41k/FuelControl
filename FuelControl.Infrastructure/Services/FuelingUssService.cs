@@ -1,4 +1,5 @@
 ﻿using FuelControl.Domain.Entities;
+using FuelControl.Domain.Enums;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Omnicomm.Reports;
@@ -10,7 +11,8 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class FuelingUssService(
     FuelControlDbContext dbContext,
     ICurrentUserService currentUserService,
-    IOmnicommReportClient omnicommReportClient)
+    IOmnicommReportClient omnicommReportClient,
+    IFuelTruckOmnicommService fuelTruckOmnicommService)
     : IFuelingUssService
 {
     public async Task<IReadOnlyList<OmnicommDeliveryEvent>> GetAvailableEventsAsync(
@@ -36,23 +38,30 @@ public sealed class FuelingUssService(
                 "За топливозаправщиком не закреплена техника.");
         }
 
-        if (fuelTruck.Vehicle.OmnicommObjectId is not { } omnicommId)
+        var omnicommId =
+            await fuelTruckOmnicommService.GetObjectIdAsync(
+                fuelTruck.Id,
+                FuelTruckOmnicommPurpose.Uss,
+                cancellationToken);
+
+        if (omnicommId is not { } ussOmnicommId)
         {
             throw new InvalidOperationException(
-                "У техники топливозаправщика не указан OmnicommId.");
+                "Для топливозаправщика не назначен " +
+                "Omnicomm ID для УСС.");
         }
 
         var (from, to) = GetDayRange(date,timeZone);
 
         var report = await omnicommReportClient.GetDeliveryReportAsync(
-            [omnicommId],
+            [ussOmnicommId],
             from,
             to,
             timeZone,
             cancellationToken: cancellationToken);
 
         var events = report.Events
-            .Where(x => x.VehicleId == omnicommId)
+            .Where(x => x.VehicleId == ussOmnicommId)
             .OrderBy(x => x.StartDate)
             .ToList();
 
@@ -147,10 +156,17 @@ public sealed class FuelingUssService(
                 "За топливозаправщиком не закреплена техника.");
         }
 
-        if (fuelTruck.Vehicle.OmnicommObjectId is not { } omnicommId)
+        var omnicommId =
+            await fuelTruckOmnicommService.GetObjectIdAsync(
+                fuelTruck.Id,
+                FuelTruckOmnicommPurpose.Uss,
+                cancellationToken);
+
+        if (omnicommId is not { } ussOmnicommId)
         {
             throw new InvalidOperationException(
-                "У техники топливозаправщика не указан OmnicommId.");
+                "Для топливозаправщика не назначен " +
+                "Omnicomm ID для УСС.");
         }
 
         var (from, to) = GetDayRange(GetDateInTimeZone(fuelingRecord.FuelingDateTime, timeZone), timeZone);
@@ -160,7 +176,7 @@ public sealed class FuelingUssService(
          * сохранением привязки.
          */
         var report = await omnicommReportClient.GetDeliveryReportAsync(
-            [omnicommId],
+            [ussOmnicommId],
             from,
             to,
             timeZone,
@@ -169,7 +185,7 @@ public sealed class FuelingUssService(
         var selectedEvents = report.Events
             .Where(x =>
                 selectedIds.Contains(x.Id) &&
-                x.VehicleId == omnicommId)
+                x.VehicleId == ussOmnicommId)
             .ToList();
 
         if (selectedEvents.Count != selectedIds.Count)

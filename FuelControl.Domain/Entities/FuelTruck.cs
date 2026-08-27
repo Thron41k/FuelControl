@@ -8,18 +8,38 @@ public sealed class FuelTruck
 
     public Vehicle Vehicle { get; private set; } = null!;
 
+    public ICollection<FuelTruckOmnicommBinding> OmnicommBindings
+    {
+        get;
+        private set;
+    } = new List<FuelTruckOmnicommBinding>();
+
     private FuelTruck()
     {
     }
 
     public FuelTruck(Guid vehicleId)
     {
+        if (vehicleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указана техника.",
+                nameof(vehicleId));
+        }
+
         Id = Guid.NewGuid();
         VehicleId = vehicleId;
     }
 
     public void ChangeVehicle(Guid vehicleId)
     {
+        if (vehicleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Не указана техника.",
+                nameof(vehicleId));
+        }
+
         VehicleId = vehicleId;
     }
 }
