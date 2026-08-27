@@ -117,9 +117,9 @@
                         <button type="button"
                                 class="btn btn-outline-primary"
                                 disabled="@(_loading
-                                                                                                      || !_loaded
-                                                                                                      || _syncing
-                                                                                                      || !_selectedVehicleId.HasValue)"
+                                                                                                                                                                                                      || !_loaded
+                                                                                                                                                                                                      || _syncing
+                                                                                                                                                                                                      || !_selectedVehicleId.HasValue)"
                                 @onclick="SyncOmnicomm">
 
                             @if (_syncing)
@@ -175,7 +175,7 @@
                                 <div>
                                     с УСС:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetStatementVsUssDifferencePercent())">
+                                                                                                                                                                                                                    GetStatementVsUssDifferencePercent())">
                                         @FormatDifference(
                                             GetStatementVsUssDifferencePercent())
                                     </strong>
@@ -184,7 +184,7 @@
                                 <div>
                                     с Omnicomm:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetStatementVsOmnicommDifferencePercent())">
+                                                                                                                                                                                                                    GetStatementVsOmnicommDifferencePercent())">
                                         @FormatDifference(
                                             GetStatementVsOmnicommDifferencePercent())
                                     </strong>
@@ -226,7 +226,7 @@
                                 <div>
                                     с ведомостью:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetUssVsStatementDifferencePercent())">
+                                                                                                                                                                                                                    GetUssVsStatementDifferencePercent())">
                                         @FormatDifference(
                                             GetUssVsStatementDifferencePercent())
                                     </strong>
@@ -235,7 +235,7 @@
                                 <div>
                                     с Omnicomm:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetUssVsOmnicommDifferencePercent())">
+                                                                                                                                                                                                                    GetUssVsOmnicommDifferencePercent())">
                                         @FormatDifference(
                                             GetUssVsOmnicommDifferencePercent())
                                     </strong>
@@ -277,7 +277,7 @@
                                 <div>
                                     с ведомостью:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetOmnicommVsStatementDifferencePercent())">
+                                                                                                                                                                                                                    GetOmnicommVsStatementDifferencePercent())">
                                         @FormatDifference(
                                             GetOmnicommVsStatementDifferencePercent())
                                     </strong>
@@ -286,7 +286,7 @@
                                 <div>
                                     с УСС:
                                     <strong class="@GetDifferenceClass(
-                                                                                GetOmnicommVsUssDifferencePercent())">
+                                                                                                                                                                                                                    GetOmnicommVsUssDifferencePercent())">
                                         @FormatDifference(
                                             GetOmnicommVsUssDifferencePercent())
                                     </strong>
@@ -828,15 +828,14 @@
     private decimal GetStatementVsUssDifferencePercent()
     {
         return CalculateDifferencePercent(
-            GetStatementVolume(),
-            GetUssVolume());
+            GetUssVolume(), GetStatementVolume()) * -1;
     }
 
     private decimal GetStatementVsOmnicommDifferencePercent()
     {
         return CalculateDifferencePercent(
-            GetStatementVolume(),
-            GetOmnicommVolume());
+            GetOmnicommVolume(),
+            GetStatementVolume()) * -1;
     }
 
     private decimal GetUssVsStatementDifferencePercent()
@@ -849,8 +848,8 @@
     private decimal GetUssVsOmnicommDifferencePercent()
     {
         return CalculateDifferencePercent(
-            GetUssVolume(),
-            GetOmnicommVolume());
+            GetOmnicommVolume(),
+            GetUssVolume()) * -1;
     }
 
     private decimal GetOmnicommVsStatementDifferencePercent()

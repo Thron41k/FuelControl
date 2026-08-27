@@ -100,7 +100,7 @@ else
                         <input type="date"
                                class="form-control"
                                value="@_selectedDate.ToString("yyyy-MM-dd")"
-                               @onchange="OnDateChanged"/>
+                               @onchange="OnDateChanged" />
 
                     </div>
 
@@ -110,6 +110,103 @@ else
 
         </div>
 
+        @if (_selectedFuelTruckId != Guid.Empty)
+        {
+            <div class="row g-3 mb-4">
+
+                <!-- Ведомость -->
+
+                <div class="col-md-6">
+
+                    <div class="card h-100">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between gap-4">
+
+                                <div>
+                                    <div class="text-muted small mb-1">
+                                        Выдано по ведомости
+                                    </div>
+
+                                    <div class="fs-4 fw-semibold">
+                                        @FormatVolume(
+                                            GetStatementIssuedVolume())
+                                    </div>
+                                </div>
+
+                                <div class="text-end small">
+
+                                    <div class="text-muted mb-1">
+                                        Расхождение
+                                    </div>
+
+                                    <div>
+                                        с УСС:
+                                        <strong class="@GetDifferenceClass(
+                                                                                                                                                                                                                                    GetStatementVsUssDifferencePercent())">
+                                            @FormatDifference(
+                                                GetStatementVsUssDifferencePercent())
+                                        </strong>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- УСС -->
+
+                <div class="col-md-6">
+
+                    <div class="card h-100">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between gap-4">
+
+                                <div>
+                                    <div class="text-muted small mb-1">
+                                        Выдано по УСС
+                                    </div>
+
+                                    <div class="fs-4 fw-semibold">
+                                        @FormatVolume(
+                                            GetUssIssuedVolume())
+                                    </div>
+                                </div>
+
+                                <div class="text-end small">
+
+                                    <div class="text-muted mb-1">
+                                        Расхождение
+                                    </div>
+
+                                    <div>
+                                        с ведомостью:
+                                        <strong class="@GetDifferenceClass(GetUssVsStatementDifferencePercent())">
+                                            @FormatDifference(GetUssVsStatementDifferencePercent())
+                                        </strong>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+        }
         <!-- Список заправок -->
 
         <div class="card">
@@ -151,93 +248,93 @@ else
 
                             <thead>
 
-                            <tr>
+                                <tr>
 
-                                <th>
-                                    Время
-                                </th>
+                                    <th>
+                                        Время
+                                    </th>
 
-                                <th>
-                                    Техника
-                                </th>
+                                    <th>
+                                        Техника
+                                    </th>
 
-                                <th>
-                                    Водитель
-                                </th>
+                                    <th>
+                                        Водитель
+                                    </th>
 
-                                <th>
-                                    Начальные показания
-                                </th>
+                                    <th>
+                                        Начальные показания
+                                    </th>
 
-                                <th>
-                                    Конечные показания
-                                </th>
+                                    <th>
+                                        Конечные показания
+                                    </th>
 
-                                <th>
-                                    Объём, л
-                                </th>
+                                    <th>
+                                        Объём, л
+                                    </th>
 
-                                <th>
-                                    Показания УСС
-                                </th>
+                                    <th>
+                                        Показания УСС
+                                    </th>
 
-                                <th>
-                                </th>
+                                    <th>
+                                    </th>
 
-                            </tr>
+                                </tr>
 
                             </thead>
 
                             <tbody>
 
-                            @foreach (var record in _fuelingRecords)
-                            {
-                                <tr>
+                                @foreach (var record in _fuelingRecords)
+                                {
+                                    <tr>
 
-                                    <td>
-                                        @FormatLocalDateTime(
-                                            record.FuelingDateTime)
-                                    </td>
+                                        <td>
+                                            @FormatLocalDateTime(
+                                                record.FuelingDateTime)
+                                        </td>
 
-                                    <td>
-                                        @record.Vehicle?.Name
-                                    </td>
+                                        <td>
+                                            @record.Vehicle?.Name
+                                        </td>
 
-                                    <td>
-                                        @record.Operator?.FullName
-                                    </td>
+                                        <td>
+                                            @record.Operator?.FullName
+                                        </td>
 
-                                    <td>
-                                        @record.CounterStart
-                                    </td>
+                                        <td>
+                                            @record.CounterStart
+                                        </td>
 
-                                    <td>
-                                        @record.CounterEnd
-                                    </td>
+                                        <td>
+                                            @record.CounterEnd
+                                        </td>
 
-                                    <td>
-                                        @record.Volume
-                                    </td>
+                                        <td>
+                                            @record.Volume
+                                        </td>
 
-                                    <td>
-                                        @GetUssDisplayText(record.Id)
-                                    </td>
+                                        <td>
+                                            @GetUssDisplayText(record.Id)
+                                        </td>
 
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-primary"
-                                                @onclick="() => OpenEditDialog(record)">
-                                            <span class="bi bi-pencil"></span>
-                                            Изменить
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger"
-                                                @onclick="() => OpenDeleteDialog(record)">
-                                            <span class="bi bi-trash"></span>
-                                            Удалить
-                                        </button>
-                                    </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-primary"
+                                                    @onclick="() => OpenEditDialog(record)">
+                                                <span class="bi bi-pencil"></span>
+                                                Изменить
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => OpenDeleteDialog(record)">
+                                                <span class="bi bi-trash"></span>
+                                                Удалить
+                                            </button>
+                                        </td>
 
-                                </tr>
-                            }
+                                    </tr>
+                                }
 
                             </tbody>
 
@@ -255,22 +352,20 @@ else
 
 <!-- Диалог выбора техники -->
 
-<VehicleSelectDialog
-    Visible="@_showVehicleDialog"
-    Vehicles="@_vehicles"
-    SelectedVehicleId="@_dialogVehicleId"
-    OnSelected="@OnVehicleSelected"
-    OnClosed="@CloseVehicleDialog" />
+<VehicleSelectDialog Visible="@_showVehicleDialog"
+                     Vehicles="@_vehicles"
+                     SelectedVehicleId="@_dialogVehicleId"
+                     OnSelected="@OnVehicleSelected"
+                     OnClosed="@CloseVehicleDialog" />
 
 
 <!-- Диалог выбора водителя -->
 
-<OperatorSelectDialog
-    Visible="@_showOperatorDialog"
-    Operators="@_operators"
-    SelectedOperatorId="@_dialogOperatorId"
-    OnSelected="@OnOperatorSelected"
-    OnClosed="@CloseOperatorDialog" />
+<OperatorSelectDialog Visible="@_showOperatorDialog"
+                      Operators="@_operators"
+                      SelectedOperatorId="@_dialogOperatorId"
+                      OnSelected="@OnOperatorSelected"
+                      OnClosed="@CloseOperatorDialog" />
 
     
 <UssSelectDialog Visible="@_showUssDialog"
@@ -284,189 +379,216 @@ else
                  OnClosed="@CloseUssDialog" />
 
 <!-- Диалог добавления / редактирования -->
-
 @if (_showDialog)
 {
     <div class="modal fade show d-block fueling-record-modal"
          tabindex="-1"
          style="background-color: rgba(0,0,0,.5);">
 
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
 
-    <div class="modal-content">
+            <div class="modal-content">
 
-    <div class="modal-header">
+                <div class="modal-header">
 
-        <h5 class="modal-title">
+                    <h5 class="modal-title">
 
-            @(_editingRecord is null
-                ? "Добавление заправки"
-                : "Редактирование заправки")
+                        @(_editingRecord is null
+                            ? "Добавление заправки"
+                            : "Редактирование заправки")
 
-        </h5>
-
-        <button type="button"
-                class="btn-close"
-                @onclick="CloseDialog">
-        </button>
-
-    </div>
-
-    <div class="modal-body">
-
-        <div class="row g-3">
-
-            <!-- Дата -->
-
-            <div class="col-md-6">
-
-                <label class="form-label">
-                    Дата
-                </label>
-
-                <input type="date"
-                       class="form-control"
-                       @bind="_dialogDate" />
-
-            </div>
-
-
-            <!-- Время -->
-
-            <div class="col-md-6">
-
-                <label class="form-label">
-                    Время
-                </label>
-
-                <input type="time"
-                       class="form-control"
-                       @bind="_dialogTime" />
-
-            </div>
-
-
-            <!-- Техника -->
-
-            <div class="col-md-12">
-
-                <label class="form-label">
-                    Техника
-                </label>
-
-                <div class="input-group">
-
-                    <input class="form-control"
-                           readonly
-                           value="@GetSelectedVehicleName()"
-                           placeholder="Техника не выбрана" />
+                    </h5>
 
                     <button type="button"
-                            class="btn btn-outline-primary"
-                            @onclick="OpenVehicleDialog">
-
-                        Выбрать
-
+                            class="btn-close"
+                            @onclick="CloseDialog">
                     </button>
 
                 </div>
 
-            </div>
+                <div class="modal-body">
+
+                    <div class="row g-3">
+
+                        <!-- Дата -->
+
+                        <div class="col-md-6">
+
+                            <label class="form-label">
+                                Дата
+                            </label>
+
+                            <input type="date"
+                                   class="form-control"
+                                   @bind="_dialogDate" />
+
+                        </div>
 
 
-            <!-- Водитель -->
+                        <!-- Время -->
 
-            <div class="col-md-12">
+                        <div class="col-md-6">
 
-                <label class="form-label">
-                    Водитель
-                </label>
+                            <label class="form-label">
+                                Время
+                            </label>
 
-                <div class="input-group">
+                            <input type="time"
+                                   class="form-control"
+                                   @bind="_dialogTime" />
 
-                    <input class="form-control"
-                           readonly
-                           value="@GetSelectedOperatorName()"
-                           placeholder="Водитель не выбран" />
-
-                    <button type="button"
-                            class="btn btn-outline-primary"
-                            @onclick="OpenOperatorDialog">
-
-                        Выбрать
-
-                    </button>
-
-                </div>
-
-            </div>
+                        </div>
 
 
-            <!-- Счётчик -->
+                        <!-- Техника -->
 
-            <div class="col-md-4">
+                        <div class="col-md-12">
 
-                <label class="form-label">
-                    Начальные показания
-                </label>
+                            <label class="form-label">
+                                Техника
+                            </label>
 
-                <input type="number"
-                       class="form-control"
-                       min="0"
-                       @bind="_dialogCounterStart" />
+                            <div class="input-group">
 
-            </div>
+                                <input class="form-control"
+                                       readonly
+                                       value="@GetSelectedVehicleName()"
+                                       placeholder="Техника не выбрана" />
 
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        @onclick="OpenVehicleDialog">
 
-            <div class="col-md-4">
+                                    Выбрать
 
-                <label class="form-label">
-                    Конечные показания
-                </label>
+                                </button>
 
-                <input type="number"
-                       class="form-control"
-                       min="0"
-                       @bind="_dialogCounterEnd" />
+                            </div>
 
-            </div>
+                        </div>
 
 
-            <div class="col-md-4">
+                        <!-- Водитель -->
 
-                <label class="form-label">
-                    Объём, л
-                </label>
+                        <div class="col-md-12">
 
-                <input type="number"
-                       class="form-control"
-                       min="1"
-                       @bind="_dialogVolume" />
+                            <label class="form-label">
+                                Водитель
+                            </label>
 
-            </div>
+                            <div class="input-group">
+
+                                <input class="form-control"
+                                       readonly
+                                       value="@GetSelectedOperatorName()"
+                                       placeholder="Водитель не выбран" />
+
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        @onclick="OpenOperatorDialog">
+
+                                    Выбрать
+
+                                </button>
+
+                            </div>
+
+                        </div>
 
 
-            <!-- УСС -->
+                        <!-- Счётчик -->
 
-            <div class="col-md-12">
+                        <div class="col-md-4">
 
-                <label class="form-label">
-                    Показания УСС
-                </label>
+                            <label class="form-label">
+                                Начальные показания
+                            </label>
 
-                <div class="input-group">
+                            <input type="number"
+                                   class="form-control"
+                                   min="0"
+                                   @bind="_dialogCounterStart" />
 
-                    <input class="form-control"
-                           readonly
+                        </div>
+
+
+                        <div class="col-md-4">
+
+                            <label class="form-label">
+                                Конечные показания
+                            </label>
+
+                            <input type="number"
+                                   class="form-control"
+                                   min="0"
+                                   @bind="_dialogCounterEnd" />
+
+                        </div>
+
+
+                        <div class="col-md-4">
+
+                            <label class="form-label">
+                                Объём, л
+                            </label>
+
+                            <input type="number"
+                                   class="form-control"
+                                   min="1"
+                                   @bind="_dialogVolume" />
+
+                        </div>
+
+
+                        <!-- УСС -->
+
+                        <div class="col-md-12">
+
+                            <label class="form-label">
+                                Показания УСС
+                            </label>
+
+                            <div class="input-group">
+
+                                <input class="form-control"
+                                       readonly
                                        value="@GetUssSelectionText(_editingRecord?.Id)"
-                           placeholder="Показания УСС не выбраны" />
+                                       placeholder="Показания УСС не выбраны" />
+
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        disabled="@(!CanSelectUss)"
+                                        @onclick="OpenUssDialog">
+
+                                    Выбрать показания УСС
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
 
                     <button type="button"
-                            class="btn btn-outline-primary"
-                            disabled="@(!CanSelectUss)"
-                            @onclick="OpenUssDialog">
+                            class="btn btn-secondary"
+                            @onclick="CloseDialog">
 
-                        Выбрать показания УСС
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@(!CanSave)"
+                            @onclick="SaveAsync">
+
+                        Сохранить
 
                     </button>
 
@@ -475,34 +597,6 @@ else
             </div>
 
         </div>
-
-    </div>
-
-
-    <div class="modal-footer">
-
-        <button type="button"
-                class="btn btn-secondary"
-                @onclick="CloseDialog">
-
-            Отмена
-
-        </button>
-
-        <button type="button"
-                class="btn btn-primary"
-                disabled="@(!CanSave)"
-                @onclick="SaveAsync">
-
-            Сохранить
-
-        </button>
-
-    </div>
-
-    </div>
-
-    </div>
 
     </div>
 }
@@ -1302,5 +1396,67 @@ else
         {
             _errorMessage = ex.Message;
         }
+    }
+
+    private decimal GetStatementIssuedVolume()
+    {
+        return _fuelingRecords.Sum(
+            x => (decimal)x.Volume);
+    }
+
+    private decimal GetUssIssuedVolume()
+    {
+        return _fuelingRecords.Sum(
+            x => x.UssRecords.Sum(
+                uss => uss.VolumeLiters));
+    }
+
+    private static decimal CalculateDifferencePercent(
+        decimal value,
+        decimal reference)
+    {
+        if (reference <= 0)
+            return 0;
+
+        return value * 100m / reference - 100m;
+    }
+
+
+
+    private decimal GetStatementVsUssDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetUssIssuedVolume(),
+            GetStatementIssuedVolume()) * -1m;
+    }
+
+    private decimal GetUssVsStatementDifferencePercent()
+    {
+        return CalculateDifferencePercent(
+            GetUssIssuedVolume(),
+            GetStatementIssuedVolume());
+    }
+
+    private static string FormatVolume(
+        decimal volume)
+    {
+        return $"{volume:0.###} л";
+    }
+
+    private static string FormatDifference(
+        decimal difference)
+    {
+        return difference switch
+        {
+            > 0m => $"+{difference:N2}%",
+            < 0m => $"{difference:N2}%",
+            _ => "0,00%"
+        };
+    }
+
+    private static string GetDifferenceClass(
+        decimal difference)
+    {
+        return Math.Abs(difference) > 2.5m ? "text-danger" : "text-success";
     }
 }
