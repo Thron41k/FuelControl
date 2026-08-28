@@ -2,6 +2,7 @@
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services;
 using FuelControl.Infrastructure.Services.Interfaces;
+using FuelControl.Infrastructure.Services.Options;
 using FuelControl.Omnicomm.Authentication;
 using FuelControl.Omnicomm.Configuration;
 using FuelControl.Omnicomm.Http;
@@ -111,6 +112,9 @@ public static class DependencyInjection
         services.AddScoped<
             IOmnicommFuelingSyncService,
             OmnicommFuelingSyncService>();
+        services.AddScoped<
+            IFuelTruckTankLevelService,
+            FuelTruckTankLevelService>();
         return services;
     }
 }

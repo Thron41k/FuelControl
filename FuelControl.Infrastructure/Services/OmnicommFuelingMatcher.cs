@@ -1,6 +1,7 @@
 ﻿using FuelControl.Domain.Entities;
 using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Infrastructure.Services.Models;
+using FuelControl.Infrastructure.Services.Options;
 using FuelControl.Omnicomm.Reports.Models;
 using Microsoft.Extensions.Options;
 

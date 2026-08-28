@@ -1,4 +1,4 @@
-﻿namespace FuelControl.Infrastructure.Services.Models;
+﻿namespace FuelControl.Infrastructure.Services.Options;
 
 public sealed class OmnicommFuelingMatchingOptions
 {
