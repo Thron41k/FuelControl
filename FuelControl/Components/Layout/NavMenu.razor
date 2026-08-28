@@ -41,6 +41,25 @@
                         <li><NavLink class="dropdown-item" href="/branches">Филиалы</NavLink></li>
                     </ul>
                 </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle @(isToolsDropdownActive ? "active" : "")"
+                       href="#" id="toolsDropdown" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="bi bi-book" aria-hidden="true"></span> Инструменты
+                    </a>
+                    <ul class="dropdown-menu"
+                        aria-labelledby="toolsDropdown">
+
+                        <li>
+                            <NavLink class="dropdown-item"
+                                     href="/tools/lld">
+                                <span class="bi bi-table me-1"></span>
+                                LLD таблицы
+                            </NavLink>
+                        </li>
+
+                    </ul>
+                </li>
             </ul>
 
             <ul class="navbar-nav align-items-center">
@@ -83,7 +102,7 @@
 @code {
     private string? currentUrl;
     private bool isDropdownActive;
-
+    private bool isToolsDropdownActive;
     protected override void OnInitialized()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
@@ -103,6 +122,9 @@
         isDropdownActive = currentUrl?.StartsWith("tankers") == true ||
                            currentUrl?.StartsWith("drivers") == true ||
                            currentUrl?.StartsWith("vehicles") == true;
+        isToolsDropdownActive =
+            currentUrl?.StartsWith("tools/", StringComparison.OrdinalIgnoreCase)
+            == true;
     }
 
     public void Dispose()

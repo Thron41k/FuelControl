@@ -12,6 +12,7 @@ public interface IOperatorService
         string fullName,
         Guid? branchId,
         string? personnelNumber,
+        string? rfidTagId,
         CancellationToken cancellationToken = default);
 
     Task UpdateAsync(
@@ -19,6 +20,7 @@ public interface IOperatorService
         string fullName,
         Guid? branchId,
         string? personnelNumber,
+        string? rfidTagId,
         CancellationToken cancellationToken = default);
 
     Task SetActiveAsync(

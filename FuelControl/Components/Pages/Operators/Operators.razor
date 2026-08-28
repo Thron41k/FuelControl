@@ -112,6 +112,9 @@
                                     Филиал(Организация)
                                 </th>
                                 <th>
+                                    RFID
+                                </th>
+                                <th>
                                     Состояние
                                 </th>
                                 <th class="text-end">
@@ -131,9 +134,12 @@
                                     <td>
                                         @driver.FullName
                                     </td>
-                                <td>
-                                    @driver.Branch.Name
-                                </td>
+                                    <td>
+                                        @driver.Branch.Name
+                                    </td>
+                                    <td>
+                                        @(driver.RfidTagId ?? "—")
+                                    </td>
                                     <td>
                                         @if (!driver.IsActive)
                                         {
@@ -339,6 +345,22 @@
                         }
 
                     </div>
+                    
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            RFID метка
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               maxlength="64"
+                               placeholder="Идентификатор RFID метки"
+                               @bind="_operatorRfidTagId"
+                               @bind:event="oninput"
+                               disabled="@_isSaving" />
+
+                    </div>
 
                 </div>
 
@@ -402,7 +424,7 @@
     private Operator? _editingOperator;
 
     private string _operatorFullName = string.Empty;
-
+    private string _operatorRfidTagId = string.Empty;
     private IEnumerable<Operator> FilteredOperators =>
         _operatorList
             .Where(MatchesSearch)
@@ -436,13 +458,22 @@
     private bool MatchesSearch(Operator @operator)
     {
         if (string.IsNullOrWhiteSpace(_searchText))
-        {
             return true;
-        }
 
-        return @operator.FullName.Contains(
-            _searchText.Trim(),
-            StringComparison.OrdinalIgnoreCase);
+        var search =
+            _searchText.Trim();
+
+        return
+            @operator.FullName.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            (
+                @operator.RfidTagId?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ?? false
+            );
     }
 
     private void OpenCreateDialog()
@@ -456,6 +487,7 @@
         _showDialog = true;
 
         _selectedBranchId = null;
+        _operatorRfidTagId = string.Empty;
     }
 
     private async Task LoadBranchesAsync()
@@ -477,6 +509,8 @@
 
         _dialogErrorMessage = null;
         _selectedBranchId = driver.BranchId;
+        _operatorRfidTagId =
+            driver.RfidTagId ?? string.Empty;
         _showDialog = true;
     }
 
@@ -521,7 +555,8 @@
                 await OperatorService.CreateAsync(
                     fullName,
                     _selectedBranchId.Value,
-                    null);
+                    null,
+                    _operatorRfidTagId);
             }
             else
             {
@@ -529,7 +564,8 @@
                     _editingOperator.Id,
                     fullName,
                     _selectedBranchId.Value,
-                    null);
+                    null,
+                    _operatorRfidTagId);
             }
 
             _showDialog = false;

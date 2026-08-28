@@ -142,8 +142,14 @@ public sealed class FuelTruckTankLevelService(
             TankCapacityLiters =
                 tank.CapacityLiters,
 
+            OpeningTimestamp =
+                usablePoints[0].Timestamp,
+
             OpeningLiters =
                 usablePoints[0].Liters,
+
+            ClosingTimestamp =
+                usablePoints[^1].Timestamp,
 
             ClosingLiters =
                 usablePoints[^1].Liters,

@@ -10,8 +10,4 @@
     <ProjectReference Include="..\FuelControl.Omnicomm\FuelControl.Omnicomm.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Enums\" />
-  </ItemGroup>
-
 </Project>

@@ -19,10 +19,18 @@ public sealed class OperatorConfiguration : IEntityTypeConfiguration<Operator>
         builder.Property(x => x.PersonnelNumber)
             .HasMaxLength(50);
 
+        builder.Property(x => x.RfidTagId)
+            .HasMaxLength(64);
+
         builder.Property(x => x.IsActive)
             .IsRequired();
 
         builder.HasIndex(x => x.PersonnelNumber);
+
+        builder.HasIndex(x => x.RfidTagId)
+            .IsUnique()
+            .HasFilter("\"RfidTagId\" IS NOT NULL");
+
         builder.HasOne(x => x.Branch)
             .WithMany()
             .HasForeignKey(x => x.BranchId)

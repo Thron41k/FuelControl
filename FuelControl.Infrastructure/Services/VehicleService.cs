@@ -141,6 +141,7 @@ public sealed class VehicleService(
         Guid? branchId,
         string? inventoryNumber,
         long? omnicommObjectId,
+        string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -149,8 +150,16 @@ public sealed class VehicleService(
             user,
             branchId);
 
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
+
         await EnsureOmnicommObjectIsAvailableAsync(
             omnicommObjectId,
+            null,
+            cancellationToken);
+
+        await EnsureRfidTagIsAvailableAsync(
+            normalizedRfidTagId,
             null,
             cancellationToken);
 
@@ -159,7 +168,8 @@ public sealed class VehicleService(
             registrationNumber.Trim(),
             targetBranchId,
             omnicommObjectId,
-            NormalizeInventoryNumber(inventoryNumber));
+            NormalizeInventoryNumber(inventoryNumber),
+            normalizedRfidTagId);
 
         dbContext.Vehicles.Add(vehicle);
 
@@ -199,6 +209,7 @@ public sealed class VehicleService(
         Guid? branchId,
         string? inventoryNumber,
         long? omnicommObjectId,
+        string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -212,6 +223,14 @@ public sealed class VehicleService(
 
         var isAdmin =
             await userManager.IsInRoleAsync(user, Roles.Admin);
+
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
+
+        await EnsureRfidTagIsAvailableAsync(
+            normalizedRfidTagId,
+            id,
+            cancellationToken);
 
         if (isAdmin)
         {
@@ -230,7 +249,8 @@ public sealed class VehicleService(
                 registrationNumber.Trim(),
                 branchId.Value,
                 omnicommObjectId,
-                NormalizeInventoryNumber(inventoryNumber));
+                NormalizeInventoryNumber(inventoryNumber),
+                normalizedRfidTagId);
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -256,6 +276,7 @@ public sealed class VehicleService(
                 "Техника относится к другому филиалу.");
         }
 
+
         // Принципиально важно:
         // branchId из браузера здесь НЕ используется.
         vehicle.Update(
@@ -263,7 +284,8 @@ public sealed class VehicleService(
             registrationNumber.Trim(),
             user.BranchId.Value,
             omnicommObjectId,
-            NormalizeInventoryNumber(inventoryNumber));
+            NormalizeInventoryNumber(inventoryNumber),
+            normalizedRfidTagId);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -393,5 +415,50 @@ public sealed class VehicleService(
         return string.IsNullOrWhiteSpace(inventoryNumber)
             ? null
             : inventoryNumber.Trim();
+    }
+
+    private async Task EnsureRfidTagIsAvailableAsync(
+        string? rfidTagId,
+        Guid? excludedVehicleId,
+        CancellationToken cancellationToken)
+    {
+        if (rfidTagId is null)
+            return;
+
+        var vehicleExists =
+            await dbContext.Vehicles.AnyAsync(
+                x =>
+                    x.RfidTagId == rfidTagId &&
+                    (excludedVehicleId == null ||
+                     x.Id != excludedVehicleId.Value),
+                cancellationToken);
+
+        if (vehicleExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена другой технике.");
+        }
+
+        var operatorExists =
+            await dbContext.Operators.AnyAsync(
+                x => x.RfidTagId == rfidTagId,
+                cancellationToken);
+
+        if (operatorExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена водителю.");
+        }
+    }
+
+    private static string? NormalizeRfidTagId(
+        string? rfidTagId)
+    {
+        if (string.IsNullOrWhiteSpace(rfidTagId))
+            return null;
+
+        return rfidTagId
+            .Trim()
+            .ToUpperInvariant();
     }
 }

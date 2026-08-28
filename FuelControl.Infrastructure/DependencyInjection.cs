@@ -92,7 +92,6 @@ public static class DependencyInjection
             IFuelingRecordAuthorizationService,
             FuelingRecordAuthorizationService>();
         services.AddScoped<IOperatorService, OperatorService>();
-        services.AddScoped<DirectoryService>();
         services.AddScoped<IFuelingRecordService,FuelingRecordService>();
         services.AddScoped<
             IFuelTruckService,
@@ -115,6 +114,12 @@ public static class DependencyInjection
         services.AddScoped<
             IFuelTruckTankLevelService,
             FuelTruckTankLevelService>();
+        services.AddScoped<
+            IOmnicommVehicleProfileClient,
+            OmnicommVehicleProfileClient>();
+        services.AddScoped<
+            IOmnicommLldService,
+            OmnicommLldService>();
         return services;
     }
 }

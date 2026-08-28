@@ -16,29 +16,30 @@
 </head>
 
 <body>
-<CascadingAuthenticationState>
-    <AuthorizeView>
-        <Authorized>
-            <Router AppAssembly="@typeof(App).Assembly">
-                <Found Context="routeData">
-                    <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-                    <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-                </Found>
-                <NotFound>
-                    <PageTitle>Not found</PageTitle>
-                    <LayoutView Layout="@typeof(MainLayout)">
-                        <p role="alert">Sorry, there's nothing at this address.</p>
-                    </LayoutView>
-                </NotFound>
-            </Router>
-        </Authorized>
-        <NotAuthorized>
-            @* Здесь встраиваем страницу логина *@
-            <Login />  @* или <Login /> — смотря как назван ваш компонент *@
-        </NotAuthorized>
-    </AuthorizeView>
-</CascadingAuthenticationState>
+    <CascadingAuthenticationState>
+        <AuthorizeView>
+            <Authorized>
+                <Router AppAssembly="@typeof(App).Assembly">
+                    <Found Context="routeData">
+                        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+                    </Found>
+                    <NotFound>
+                        <PageTitle>Not found</PageTitle>
+                        <LayoutView Layout="@typeof(MainLayout)">
+                            <p role="alert">Sorry, there's nothing at this address.</p>
+                        </LayoutView>
+                    </NotFound>
+                </Router>
+            </Authorized>
+            <NotAuthorized>
+                @* Здесь встраиваем страницу логина *@
+                <Login />  @* или <Login /> — смотря как назван ваш компонент *@
+            </NotAuthorized>
+        </AuthorizeView>
+    </CascadingAuthenticationState>
     <script src="js/timezone.js"></script>
+    <script src="js/main.js"></script>
     <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>

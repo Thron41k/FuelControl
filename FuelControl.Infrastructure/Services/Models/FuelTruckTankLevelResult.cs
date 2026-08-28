@@ -18,6 +18,10 @@ public sealed class FuelTruckTankLevelResult
 
     public decimal ClosingLiters { get; init; }
 
+    public DateTimeOffset OpeningTimestamp { get; init; }
+
+    public DateTimeOffset ClosingTimestamp { get; init; }
+
     public decimal MinLiters { get; init; }
 
     public decimal MaxLiters { get; init; }

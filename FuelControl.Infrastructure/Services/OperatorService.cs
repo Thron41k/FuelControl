@@ -58,6 +58,7 @@ public sealed class OperatorService(
         string fullName,
         Guid? branchId,
         string? personnelNumber,
+        string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -67,8 +68,15 @@ public sealed class OperatorService(
             branchId);
 
         var normalizedFullName = NormalizeFullName(fullName);
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
         var normalizedPersonnelNumber =
             NormalizePersonnelNumber(personnelNumber);
+
+        await EnsureRfidTagIsAvailableAsync(
+            normalizedRfidTagId,
+            null,
+            cancellationToken);
 
         await EnsureFullNameIsAvailableAsync(
             normalizedFullName,
@@ -79,7 +87,8 @@ public sealed class OperatorService(
         var @operator = new Operator(
             normalizedFullName,
             targetBranchId,
-            normalizedPersonnelNumber);
+            normalizedPersonnelNumber,
+            normalizedRfidTagId);
 
         dbContext.Operators.Add(@operator);
 
@@ -93,6 +102,7 @@ public sealed class OperatorService(
         string fullName,
         Guid? branchId,
         string? personnelNumber,
+        string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
         var user = await GetRequiredUserAsync();
@@ -146,7 +156,8 @@ public sealed class OperatorService(
             // пришедшему от Dispatcher из браузера.
             targetBranchId = user.BranchId.Value;
         }
-
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
         var normalizedFullName = NormalizeFullName(fullName);
         var normalizedPersonnelNumber =
             NormalizePersonnelNumber(personnelNumber);
@@ -157,10 +168,16 @@ public sealed class OperatorService(
             id,
             cancellationToken);
 
+        await EnsureRfidTagIsAvailableAsync(
+            normalizedRfidTagId,
+            id,
+            cancellationToken);
+
         @operator.Update(
             normalizedFullName,
             targetBranchId,
-            normalizedPersonnelNumber);
+            normalizedPersonnelNumber,
+            normalizedRfidTagId);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -369,6 +386,51 @@ public sealed class OperatorService(
         return string.IsNullOrWhiteSpace(personnelNumber)
             ? null
             : personnelNumber.Trim();
+    }
+
+    private async Task EnsureRfidTagIsAvailableAsync(
+        string? rfidTagId,
+        Guid? excludedOperatorId,
+        CancellationToken cancellationToken)
+    {
+        if (rfidTagId is null)
+            return;
+
+        var operatorExists =
+            await dbContext.Operators.AnyAsync(
+                x =>
+                    x.RfidTagId == rfidTagId &&
+                    (excludedOperatorId == null ||
+                     x.Id != excludedOperatorId.Value),
+                cancellationToken);
+
+        if (operatorExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена другому водителю.");
+        }
+
+        var vehicleExists =
+            await dbContext.Vehicles.AnyAsync(
+                x => x.RfidTagId == rfidTagId,
+                cancellationToken);
+
+        if (vehicleExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена технике.");
+        }
+    }
+
+    private static string? NormalizeRfidTagId(
+        string? rfidTagId)
+    {
+        if (string.IsNullOrWhiteSpace(rfidTagId))
+            return null;
+
+        return rfidTagId
+            .Trim()
+            .ToUpperInvariant();
     }
 }
 

@@ -17,6 +17,7 @@ public interface IVehicleService
         Guid? branchId,
         string? inventoryNumber,
         long? omnicommObjectId,
+        string? rfidTagId,
         CancellationToken cancellationToken = default);
 
     Task UpdateAsync(
@@ -26,6 +27,7 @@ public interface IVehicleService
         Guid? branchId,
         string? inventoryNumber,
         long? omnicommObjectId,
+        string? rfidTagId,
         CancellationToken cancellationToken = default);
 
     Task SetActiveAsync(

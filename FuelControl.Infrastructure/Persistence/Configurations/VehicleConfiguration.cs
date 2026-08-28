@@ -23,6 +23,9 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.Property(x => x.InventoryNumber)
             .HasMaxLength(50);
 
+        builder.Property(x => x.RfidTagId)
+            .HasMaxLength(64);
+
         builder.Property(x => x.IsActive)
             .IsRequired();
 
@@ -32,6 +35,10 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasIndex(x => x.OmnicommObjectId)
             .IsUnique()
             .HasFilter("\"OmnicommObjectId\" IS NOT NULL");
+
+        builder.HasIndex(x => x.RfidTagId)
+            .IsUnique()
+            .HasFilter("\"RfidTagId\" IS NOT NULL");
 
         builder.HasOne(x => x.Branch)
             .WithMany()

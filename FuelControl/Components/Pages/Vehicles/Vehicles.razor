@@ -120,9 +120,13 @@
                         <th>
                             Госномер
                         </th>
-                        
+
                         <th>
                             Omnicomm ID
+                        </th>
+
+                        <th>
+                            RFID
                         </th>
 
                         <th>
@@ -140,7 +144,7 @@
                     @if (_isLoading)
                     {
                         <tr>
-                            <td colspan="6"
+                            <td colspan="7"
                                 class="text-center py-5">
 
                                 <div class="spinner-border"
@@ -157,7 +161,7 @@
                     else if (!FilteredVehicles.Any())
                     {
                         <tr>
-                            <td colspan="6"
+                            <td colspan="7"
                                 class="text-center text-muted py-5">
 
                                 Техника не найдена.
@@ -187,6 +191,10 @@
 
                                 <td>
                                     @vehicle.OmnicommObjectId
+                                </td>
+
+                                <td>
+                                    @(vehicle.RfidTagId ?? "—")
                                 </td>
 
                                 <td>
@@ -283,7 +291,7 @@
                         @(_editingVehicle is null
                                             ? "Добавление техники"
                                             : "Редактирование техники")
-                </h5>
+                    </h5>
 
                     <button type="button"
                             class="btn-close"
@@ -299,7 +307,7 @@
 
                     <div class="modal-body">
 
-                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                        @if (!string.IsNullOrWhiteSpace(_errorMessage))
                         {
                             <div class="alert alert-danger">
                                 @_errorMessage
@@ -504,12 +512,12 @@
                             <ValidationMessage For="() => _editModel.RegistrationNumber" />
 
                         </div>
-                        
-                        
 
+                        
+                        
                         <AuthorizeView Roles="@Roles.Admin">
                             <ChildContent Context="adminContext">
-                                
+
                                 <div class="mb-3">
 
                                     <label class="form-label">
@@ -517,8 +525,21 @@
                                     </label>
 
                                     <InputNumber class="form-control"
-                                               @bind-Value="_editModel.OmnicommObjectId" />
+                                                 @bind-Value="_editModel.OmnicommObjectId" />
 
+
+                                </div>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label">
+                                        RFID метка
+                                    </label>
+
+                                    <InputText class="form-control"
+                                               @bind-Value="_editModel.RfidTagId"
+                                               maxlength="64"
+                                               placeholder="Идентификатор RFID метки" />
 
                                 </div>
 
@@ -544,8 +565,7 @@
 
                                     </InputSelect>
 
-                                    <ValidationMessage
-                                        For="() => _editModel.BranchId" />
+                                    <ValidationMessage For="() => _editModel.BranchId" />
 
                                 </div>
 
@@ -969,7 +989,17 @@
                || (vehicle.InventoryNumber?.Contains(
                        search,
                        StringComparison.OrdinalIgnoreCase)
-                   ?? false);
+                   ?? false)
+               ||
+               (vehicle.RfidTagId?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ?? false)
+               ||
+               (vehicle.OmnicommObjectId?.ToString().Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ?? false);
     }
 
     private bool MatchesStatus(Vehicle vehicle)
@@ -1099,7 +1129,8 @@
             RegistrationNumber = vehicle.RegistrationNumber,
             InventoryNumber = vehicle.InventoryNumber,
             BranchId = vehicle.BranchId,
-            OmnicommObjectId = vehicle.OmnicommObjectId
+            OmnicommObjectId = vehicle.OmnicommObjectId,
+            RfidTagId = vehicle.RfidTagId
         };
 
         _showDialog = true;
@@ -1140,7 +1171,8 @@
                     _editModel.RegistrationNumber,
                     _editModel.BranchId,
                     _editModel.InventoryNumber,
-                    _editModel.OmnicommObjectId);
+                    _editModel.OmnicommObjectId,
+                    _editModel.RfidTagId);
             }
             else
             {
@@ -1150,7 +1182,8 @@
                     _editModel.RegistrationNumber,
                     _editModel.BranchId,
                     _editModel.InventoryNumber,
-                    _editModel.OmnicommObjectId);
+                    _editModel.OmnicommObjectId,
+                    _editModel.RfidTagId);
             }
 
             CloseDialog();
@@ -1220,5 +1253,7 @@
 
         public Guid? BranchId { get; set; }
         public long? OmnicommObjectId { get; set; } = null;
+
+        public string? RfidTagId { get; set; }
     }
 }

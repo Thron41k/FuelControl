@@ -13,6 +13,7 @@ public sealed class Vehicle
     public string? InventoryNumber { get; private set; }
 
     public long? OmnicommObjectId { get; private set; }
+    public string? RfidTagId { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -25,7 +26,8 @@ public sealed class Vehicle
         string registrationNumber,
         Guid branch,
         long? omnicommObjectId,
-        string? inventoryNumber = null)
+        string? inventoryNumber = null,
+        string? rfidTagId = null)
     {
         Id = Guid.NewGuid();
         OmnicommObjectId = omnicommObjectId;
@@ -34,6 +36,7 @@ public sealed class Vehicle
         InventoryNumber = inventoryNumber;
         BranchId = branch;
         IsActive = true;
+        RfidTagId = rfidTagId;
     }
 
     public void Update(
@@ -41,12 +44,14 @@ public sealed class Vehicle
         string registrationNumber,
         Guid branch,
         long? omnicommObjectId,
-        string? inventoryNumber)
+        string? inventoryNumber,
+        string? rfidTagId)
     {
         Name = name;
         OmnicommObjectId = omnicommObjectId;
         RegistrationNumber = registrationNumber;
         InventoryNumber = inventoryNumber;
+        RfidTagId = rfidTagId;
         BranchId = branch;
     }
 
