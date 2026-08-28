@@ -15,7 +15,8 @@ public sealed class OmnicommReportClient(
         PropertyNameCaseInsensitive = true,
         Converters =
         {
-            new OmnicommSpeedPointDtoConverter()
+            new OmnicommSpeedPointDtoConverter(),
+            new OmnicommFuelLevelPointDtoConverter()
         }
     };
 
@@ -474,6 +475,229 @@ public sealed class OmnicommReportClient(
             ReportId = raw.Id,
             Status = raw.Status,
             MaximalSpeedKmh = raw.Results?.MaximalSpeed ?? 0,
+            Points = points
+        };
+    }
+
+    public async Task<OmnicommFuelLevelReport> GetFuelLevelReportAsync(
+    IReadOnlyList<long> vehicleIds,
+    DateTimeOffset from,
+    DateTimeOffset to,
+    OmnicommTimeZone timeZone,
+    CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(vehicleIds);
+        ArgumentNullException.ThrowIfNull(timeZone);
+
+        if (vehicleIds.Count == 0)
+        {
+            throw new ArgumentException(
+                "Необходимо указать хотя бы один vehicleId.",
+                nameof(vehicleIds));
+        }
+
+        if (to <= from)
+        {
+            throw new ArgumentException(
+                "Дата окончания должна быть больше даты начала.");
+        }
+
+        var fromMs =
+            from.ToUnixTimeMilliseconds();
+
+        var toMs =
+            to.ToUnixTimeMilliseconds();
+
+        var requestBody = new
+        {
+            @params = new
+            {
+                from = fromMs,
+                to = toMs,
+
+                @params = new
+                {
+                    winterOffset =
+                        timeZone.WinterOffset,
+
+                    summerOffset =
+                        timeZone.SummerOffset,
+
+                    action = "getReportData",
+
+                    newui = true,
+
+                    locale = "ru",
+
+                    reportFromdate = fromMs,
+
+                    fromDatetime = fromMs,
+
+                    reportTodate = toMs,
+
+                    toDatetime = toMs,
+
+                    selectedRoots = new[]
+                    {
+                    "FTC"
+                },
+
+                    ID = vehicleIds,
+
+                    vehicleID = vehicleIds,
+
+                    tz = timeZone.TimeZone,
+
+                    objectType = new[]
+                    {
+                    "FTC"
+                },
+
+                    objectClass = new[]
+                    {
+                    1
+                },
+
+                    service = false,
+
+                    maxPoints = 300
+                },
+
+                url = "/fuellevels",
+
+                method = "POST",
+
+                traditional = true
+            },
+
+            tz = timeZone.TimeZone,
+
+            type = "ASEReport",
+
+            service = false,
+
+            sync = 1,
+
+            rebuild = true
+        };
+
+        using var response =
+            await apiClient.SendAsync(
+                () =>
+                {
+                    var message =
+                        new HttpRequestMessage(
+                            HttpMethod.Post,
+                            "/service/reports/");
+
+                    message.Content =
+                        JsonContent.Create(
+                            requestBody,
+                            options: JsonOptions);
+
+                    return message;
+                },
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        var json =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        var raw =
+            JsonSerializer.Deserialize<
+                OmnicommFuelLevelReportResponse>(
+                    json,
+                    JsonOptions);
+
+        if (raw is null)
+        {
+            throw new InvalidOperationException(
+                "Omnicomm вернул пустой ответ отчёта fuellevels.");
+        }
+
+        if (!string.Equals(
+                raw.Status,
+                "SUCCESS",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Omnicomm вернул статус отчёта: {raw.Status}");
+        }
+
+        var tanks =
+            raw.Results?.Data
+                .Select(MapFuelLevelTank)
+                .ToList()
+            ?? [];
+
+        return new OmnicommFuelLevelReport
+        {
+            ReportId = raw.Id,
+
+            Status = raw.Status,
+
+            VehicleId =
+                vehicleIds.Count == 1
+                    ? vehicleIds[0]
+                    : 0,
+
+            TotalRecords =
+                tanks.Sum(x => x.Points.Count),
+
+            Tanks = tanks
+        };
+    }
+
+    private static OmnicommFuelLevelTank MapFuelLevelTank(
+        OmnicommFuelLevelDataDto data)
+    {
+        var rawValues =
+            data.RawValues.ToDictionary(
+                x => x.Timestamp,
+                x => x.FuelLiters);
+
+        var approxValues =
+            data.ApproxValues.ToDictionary(
+                x => x.Timestamp,
+                x => x.FuelLiters);
+
+        var timestamps =
+            rawValues.Keys
+                .Union(approxValues.Keys)
+                .Order();
+
+        var points =
+            timestamps
+                .Select(timestamp =>
+                    new OmnicommFuelLevelPoint
+                    {
+                        Timestamp =
+                            DateTimeOffset
+                                .FromUnixTimeMilliseconds(
+                                    timestamp),
+
+                        RawLiters =
+                            rawValues.TryGetValue(
+                                timestamp,
+                                out var raw)
+                                ? raw
+                                : null,
+
+                        ApproxLiters =
+                            approxValues.TryGetValue(
+                                timestamp,
+                                out var approx)
+                                ? approx
+                                : null
+                    })
+                .ToList();
+
+        return new OmnicommFuelLevelTank
+        {
+            TankNumber = data.TankNumber,
+            CapacityLiters = data.TankCapacity,
             Points = points
         };
     }

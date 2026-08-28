@@ -24,4 +24,11 @@ public interface IOmnicommReportClient
         DateTimeOffset to,
         OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default);
+
+    Task<OmnicommFuelLevelReport> GetFuelLevelReportAsync(
+        IReadOnlyList<long> vehicleIds,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        OmnicommTimeZone timeZone,
+        CancellationToken cancellationToken = default);
 }
