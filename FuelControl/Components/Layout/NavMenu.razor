@@ -22,20 +22,6 @@
                         <span class="bi bi-plus-circle" aria-hidden="true"></span> Добавление заправок
                     </NavLink>
                 </li>
-                <AuthorizeView Roles="@Roles.Admin,@Roles.Moderator">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle @(_isDropdownActive ? "active" : "")"
-                       href="#" id="navbarDropdown" role="button"
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="bi bi-book" aria-hidden="true"></span> Справочники
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                        <li><NavLink class="dropdown-item" href="/fuel-trucks">Топливозаправщики</NavLink></li>
-                        <li><NavLink class="dropdown-item" href="/drivers">Водители</NavLink></li>
-                        <li><NavLink class="dropdown-item" href="/vehicles">Техника</NavLink></li>
-                        <li><NavLink class="dropdown-item" href="/branches">Филиалы</NavLink></li>
-                    </ul>
-                </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle @(_isToolsDropdownActive ? "active" : "")"
                        href="#" id="toolsDropdown" role="button"
@@ -55,8 +41,20 @@
 
                     </ul>
                 </li>
-                </AuthorizeView>
                 <AuthorizeView Roles="@Roles.Admin">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle @(_isDropdownActive ? "active" : "")"
+                           href="#" id="navbarDropdown" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="bi bi-book" aria-hidden="true"></span> Справочники
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <li><NavLink class="dropdown-item" href="/fuel-trucks">Топливозаправщики</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="/drivers">Водители</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="/vehicles">Техника</NavLink></li>
+                            <li><NavLink class="dropdown-item" href="/branches">Филиалы</NavLink></li>
+                        </ul>
+                    </li>
                     <li class="nav-item dropdown">
 
                         <a class="nav-link dropdown-toggle @(_isAdministrationDropdownActive ? "active" : "")"

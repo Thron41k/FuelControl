@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using FuelControl.Omnicomm.Vehicles.Models
 
-@attribute [Authorize(Roles = $"{Roles.Admin},{Roles.Dispatcher}")]
+@attribute [Authorize(Roles = Roles.Admin)]
 
 @inject IVehicleService VehicleService
 @inject IBranchService BranchService

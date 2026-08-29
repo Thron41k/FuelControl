@@ -1,7 +1,10 @@
 @page "/drivers"
 @rendermode InteractiveServer
+@attribute [Authorize(Roles = Roles.Admin)]
 @using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
 
 @inject IOperatorService OperatorService
 @inject IBranchService BranchService

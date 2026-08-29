@@ -1,6 +1,6 @@
 ﻿@page "/branches"
 @rendermode InteractiveServer
-
+@attribute [Authorize(Roles = Roles.Admin)]
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
