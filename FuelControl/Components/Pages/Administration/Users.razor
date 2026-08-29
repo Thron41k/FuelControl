@@ -1,0 +1,870 @@
+﻿@page "/administration/users"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = Roles.Admin)]
+
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
+@using FuelControl.Infrastructure.Services.Interfaces
+@using FuelControl.Infrastructure.Services.Models
+@using Microsoft.AspNetCore.Authorization
+
+@inject IUserAdministrationService UserAdministrationService
+@inject IBranchService BranchService
+
+<PageTitle>Пользователи</PageTitle>
+
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <div>
+            <h3 class="mb-1">
+                Пользователи
+            </h3>
+
+            <div class="text-muted">
+                Управление учетными записями пользователей системы
+            </div>
+        </div>
+
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="OpenCreateDialog">
+
+            <i class="bi bi-person-plus me-1"></i>
+
+            Добавить
+
+        </button>
+
+    </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+
+            @_errorMessage
+
+            <button type="button"
+                    class="btn-close"
+                    @onclick="ClearError">
+            </button>
+
+        </div>
+    }
+
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Поиск
+                </label>
+
+                <input type="search"
+                       class="form-control"
+                       placeholder="Email или имя..."
+                       @bind="_searchText"
+                       @bind:event="oninput" />
+
+            </div>
+
+
+            @if (_loading)
+            {
+                <div class="d-flex justify-content-center py-5">
+
+                    <div class="spinner-border">
+                    </div>
+
+                </div>
+            }
+            else if (!FilteredUsers.Any())
+            {
+                <div class="text-center text-muted py-5">
+                    Пользователи не найдены.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Пользователь
+                                </th>
+
+                                <th>
+                                    Филиал
+                                </th>
+
+                                <th>
+                                    Роль
+                                </th>
+
+                                <th>
+                                    Состояние
+                                </th>
+
+                                <th class="text-end">
+                                    Действия
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var user in FilteredUsers)
+                            {
+                                <tr>
+
+                                    <td>
+
+                                        <div class="fw-semibold">
+                                            @user.DisplayName
+                                        </div>
+
+                                        <div class="small text-muted">
+                                            @user.Email
+                                        </div>
+
+                                    </td>
+
+                                    <td>
+                                        @(user.BranchName ?? "—")
+                                    </td>
+
+                                    <td>
+
+                                        @if (user.Role == Roles.Admin)
+                                        {
+                                            <span class="badge text-bg-primary">
+                                                Администратор
+                                            </span>
+                                        }
+                                        else if (user.Role == Roles.Dispatcher)
+                                        {
+                                            <span class="badge text-bg-secondary">
+                                                Диспетчер
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-light">
+                                                @user.Role
+                                            </span>
+                                        }
+
+                                    </td>
+
+                                    <td>
+
+                                        @if (user.IsLockedOut)
+                                        {
+                                            <span class="badge text-bg-danger">
+                                                Заблокирован
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-success">
+                                                Активен
+                                            </span>
+                                        }
+
+                                    </td>
+
+                                    <td class="text-end">
+
+                                        <div class="btn-group">
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    @onclick="() => OpenEditDialog(user)">
+
+                                                <i class="bi bi-pencil"></i>
+                                                Изменить
+
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    @onclick="() => OpenPasswordDialog(user)">
+
+                                                <i class="bi bi-key"></i>
+                                                Пароль
+
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-sm @(user.IsLockedOut
+                                                                                                                          ? "btn-outline-success"
+                                                                                                                          : "btn-outline-danger")"
+                                                    @onclick="() => ToggleUserLock(user)">
+
+                                                <i class="bi @(user.IsLockedOut
+                                                                                                                ? "bi-unlock"
+                                                                                                                : "bi-lock")"></i>
+
+                                                @(user.IsLockedOut
+                                                    ? "Разблокировать"
+                                                    : "Заблокировать")
+
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+</div>
+@if (_showUserDialog)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+
+                        @(_editingUser is null
+                            ? "Добавление пользователя"
+                            : "Редактирование пользователя")
+
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseUserDialog"
+                            disabled="@_saving">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(_dialogError))
+                    {
+                        <div class="alert alert-danger">
+                            @_dialogError
+                        </div>
+                    }
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Email
+                        </label>
+
+                        <input type="email"
+                               class="form-control"
+                               @bind="_email"
+                               disabled="@_saving" />
+
+                    </div>
+
+                    @if (_editingUser is null)
+                    {
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Пароль
+                            </label>
+
+                            <input type="password"
+                                   class="form-control"
+                                   @bind="_newPassword"
+                                   disabled="@_saving"
+                                   autocomplete="new-password" />
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Подтверждение пароля
+                            </label>
+
+                            <input type="password"
+                                   class="form-control"
+                                   @bind="_confirmPassword"
+                                   disabled="@_saving"
+                                   autocomplete="new-password" />
+
+                        </div>
+                    }
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Имя
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               @bind="_displayName"
+                               disabled="@_saving" />
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Филиал
+                        </label>
+
+                        <select class="form-select"
+                                @bind="_branchId"
+                                disabled="@_saving">
+
+                            <option value="">
+                                Без филиала
+                            </option>
+
+                            @foreach (var branch in _branches)
+                            {
+                                <option value="@branch.Id">
+                                    @branch.Name
+                                </option>
+                            }
+
+                        </select>
+
+                    </div>
+
+                    <div>
+
+                        <label class="form-label">
+                            Роль
+                        </label>
+
+                        <select class="form-select"
+                                @bind="_role"
+                                disabled="@_saving">
+
+                            <option value="@Roles.Dispatcher">
+                                Диспетчер
+                            </option>
+
+                            <option value="@Roles.Admin">
+                                Администратор
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseUserDialog"
+                            disabled="@_saving">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveUser"
+                            disabled="@_saving">
+
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+
+                        Сохранить
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+@if (_showPasswordDialog && _passwordUser is not null)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         style="background-color: rgba(0,0,0,.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+                        Смена пароля
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="ClosePasswordDialog"
+                            disabled="@_saving">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    @if (!string.IsNullOrWhiteSpace(_dialogError))
+                    {
+                        <div class="alert alert-danger">
+                            @_dialogError
+                        </div>
+                    }
+
+                    <div class="mb-3">
+
+                        <div class="text-muted small">
+                            Пользователь
+                        </div>
+
+                        <div class="fw-semibold">
+                            @_passwordUser.DisplayName
+                        </div>
+
+                        <div class="small text-muted">
+                            @_passwordUser.Email
+                        </div>
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Новый пароль
+                        </label>
+
+                        <input type="password"
+                               class="form-control"
+                               @bind="_newPassword"
+                               disabled="@_saving"
+                               autocomplete="new-password" />
+
+                    </div>
+
+                    <div>
+
+                        <label class="form-label">
+                            Подтверждение пароля
+                        </label>
+
+                        <input type="password"
+                               class="form-control"
+                               @bind="_confirmPassword"
+                               disabled="@_saving"
+                               autocomplete="new-password" />
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="ClosePasswordDialog"
+                            disabled="@_saving">
+
+                        Отмена
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SavePassword"
+                            disabled="@_saving">
+
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+
+                        Изменить пароль
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+@code
+{
+    private IReadOnlyList<AdminUserModel> _users = [];
+
+    private IReadOnlyList<Branch> _branches = [];
+
+    private string _searchText = string.Empty;
+
+    private bool _loading;
+
+    private bool _saving;
+
+    private bool _showUserDialog;
+
+    private bool _showPasswordDialog;
+
+    private AdminUserModel? _editingUser;
+
+    private AdminUserModel? _passwordUser;
+
+    private string _email = string.Empty;
+
+    private string _displayName = string.Empty;
+
+    private Guid? _branchId;
+
+    private string _role = Roles.Dispatcher;
+
+    private string _newPassword = string.Empty;
+
+    private string _confirmPassword = string.Empty;
+
+    private string? _errorMessage;
+
+    private string? _dialogError;
+
+
+    private IEnumerable<AdminUserModel> FilteredUsers =>
+        _users.Where(MatchesSearch);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _branches =
+                await BranchService.GetAllAsync();
+
+            _users =
+                await UserAdministrationService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+    private bool MatchesSearch(
+        AdminUserModel user)
+    {
+        if (string.IsNullOrWhiteSpace(
+                _searchText))
+        {
+            return true;
+        }
+
+        var search =
+            _searchText.Trim();
+
+        return
+            user.Email.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            user.DisplayName.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            (
+                user.BranchName?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                ?? false
+            );
+    }
+
+
+    private async Task OpenCreateDialog()
+    {
+        _editingUser = null;
+
+        _email = string.Empty;
+        _displayName = string.Empty;
+        _branchId = null;
+        _role = Roles.Dispatcher;
+
+        _dialogError = null;
+
+        _showUserDialog = true;
+        _newPassword = string.Empty;
+        _confirmPassword = string.Empty;
+    }
+
+
+    private void OpenEditDialog(
+        AdminUserModel user)
+    {
+        _editingUser = user;
+
+        _email =
+            user.Email;
+
+        _displayName =
+            user.DisplayName;
+
+        _branchId =
+            user.BranchId;
+
+        _role =
+            string.IsNullOrWhiteSpace(user.Role)
+                ? Roles.Dispatcher
+                : user.Role;
+
+        _dialogError = null;
+
+        _showUserDialog = true;
+    }
+
+
+    private void CloseUserDialog()
+    {
+        if (_saving)
+            return;
+
+        _showUserDialog = false;
+        _editingUser = null;
+        _dialogError = null;
+    }
+
+
+    private async Task SaveUser()
+    {
+        _dialogError = null;
+
+        if (string.IsNullOrWhiteSpace(_email))
+        {
+            _dialogError =
+                "Укажите Email.";
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_displayName))
+        {
+            _dialogError =
+                "Укажите имя пользователя.";
+
+            return;
+        }
+
+        if (_editingUser is null)
+        {
+            if (string.IsNullOrWhiteSpace(_newPassword))
+            {
+                _dialogError =
+                    "Введите пароль.";
+
+                return;
+            }
+
+            if (_newPassword != _confirmPassword)
+            {
+                _dialogError =
+                    "Пароли не совпадают.";
+
+                return;
+            }
+        }
+
+        _saving = true;
+
+        try
+        {
+            if (_editingUser is null)
+            {
+                var password =
+                    _newPassword;
+
+                await UserAdministrationService.CreateAsync(
+                    _email,
+                    _displayName,
+                    password,
+                    _branchId,
+                    _role);
+            }
+            else
+            {
+                await UserAdministrationService.UpdateAsync(
+                    _editingUser.Id,
+                    _email,
+                    _displayName,
+                    _branchId,
+                    _role);
+            }
+
+            _showUserDialog = false;
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _dialogError =
+                ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+
+    private void OpenPasswordDialog(
+        AdminUserModel user)
+    {
+        _passwordUser = user;
+
+        _newPassword = string.Empty;
+        _confirmPassword = string.Empty;
+
+        _dialogError = null;
+
+        _showPasswordDialog = true;
+    }
+
+
+    private void ClosePasswordDialog()
+    {
+        if (_saving)
+            return;
+
+        _showPasswordDialog = false;
+        _passwordUser = null;
+
+        _newPassword = string.Empty;
+        _confirmPassword = string.Empty;
+
+        _dialogError = null;
+    }
+
+
+    private async Task SavePassword()
+    {
+        _dialogError = null;
+
+        if (_passwordUser is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(
+                _newPassword))
+        {
+            _dialogError =
+                "Введите новый пароль.";
+
+            return;
+        }
+
+        if (_newPassword != _confirmPassword)
+        {
+            _dialogError =
+                "Пароли не совпадают.";
+
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            await UserAdministrationService
+                .ResetPasswordAsync(
+                    _passwordUser.Id,
+                    _newPassword);
+
+            ClosePasswordDialog();
+        }
+        catch (Exception ex)
+        {
+            _dialogError =
+                ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+
+    private async Task ToggleUserLock(
+        AdminUserModel user)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await UserAdministrationService.SetLockedAsync(
+                user.Id,
+                !user.IsLockedOut);
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage =
+                ex.Message;
+        }
+    }
+
+
+    private void ClearError()
+    {
+        _errorMessage = null;
+    }
+}

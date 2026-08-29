@@ -10,7 +10,8 @@ namespace FuelControl.Infrastructure.Identity
     {
         public const string Admin = "Admin";
         public const string Dispatcher = "Dispatcher";
+        public const string Moderator = "Moderator";
 
-        public static readonly string[] All = [Admin, Dispatcher];
+        public static readonly string[] All = [Admin, Dispatcher,Moderator];
     }
 }

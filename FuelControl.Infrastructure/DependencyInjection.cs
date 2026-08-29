@@ -120,6 +120,9 @@ public static class DependencyInjection
         services.AddScoped<
             IOmnicommLldService,
             OmnicommLldService>();
+        services.AddScoped<
+            IUserAdministrationService,
+            UserAdministrationService>();
         return services;
     }
 }
