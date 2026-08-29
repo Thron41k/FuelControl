@@ -436,9 +436,9 @@
         int digitsToRemove)
     {
         var records =
-            table.Records
-                .OrderBy(x => x.Liters)
-                .ToList();
+            PrepareRecords(
+                table,
+                digitsToRemove);
 
         if (records.Count == 0)
         {
@@ -446,13 +446,8 @@
                 "LLD таблица не содержит записей.");
         }
 
-        var scale =
-            GetVolumeScale(digitsToRemove);
-
         var step =
-            records.Count > 1
-                ? (records[1].Liters - records[0].Liters) / scale
-                : 0m;
+            CalculateVolumeStep(records);
 
         var builder =
             new StringBuilder();
@@ -466,16 +461,44 @@
 
         foreach (var record in records)
         {
-            var volume =
-                record.Liters / scale;
-
             builder.AppendLine(
-                $"{FormatValue(volume)};" +
+                $"{FormatValue(record.Liters)};" +
                 record.Code.ToString(
                     CultureInfo.InvariantCulture));
         }
 
         return builder.ToString();
+    }
+
+    private static IReadOnlyList<LldCalibrationRecord> PrepareRecords(
+        LldCalibrationTable table,
+        int digitsToRemove)
+    {
+        var scale =
+            GetVolumeScale(digitsToRemove);
+
+        return table.Records
+            .Select(record =>
+                new LldCalibrationRecord(
+                    record.Code,
+                    decimal.Truncate(
+                        record.Liters / scale)))
+            .GroupBy(record => record.Liters)
+            .Select(group =>
+                group.MaxBy(record => record.Code)!)
+            .OrderBy(record => record.Liters)
+            .ToArray();
+    }
+
+    private static decimal CalculateVolumeStep(
+        IReadOnlyList<LldCalibrationRecord> records)
+    {
+        return records.Count switch
+        {
+            < 2 => 0m,
+            2 => records[1].Liters - records[0].Liters,
+            _ => records[2].Liters - records[1].Liters
+        };
     }
 
     private static decimal GetVolumeScale(
