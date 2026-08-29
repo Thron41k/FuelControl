@@ -170,3 +170,20 @@ h1:focus {
         max-width: none;
     }
 }
+
+.lld-table-toggle {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
+}
+
+    .lld-table-toggle:hover,
+    .lld-table-toggle:focus,
+    .lld-table-toggle:focus-visible,
+    .lld-table-toggle:active {
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: none !important;
+        background: transparent !important;
+    }

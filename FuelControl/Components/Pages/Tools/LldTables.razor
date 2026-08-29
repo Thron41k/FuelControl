@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = Roles.Admin)]
 
+@using System.Globalization
+@using System.Text
 @using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
@@ -50,7 +52,7 @@
 
         <div class="card-body">
 
-            <div class="row g-3 align-items-end">
+            <div class="row g-3">
 
                 <div class="col-md-8">
 
@@ -70,35 +72,20 @@
                                 @onclick="OpenVehicleDialog">
 
                             <i class="bi bi-search me-1"></i>
-
                             Выбрать
 
                         </button>
 
                     </div>
 
-                    @if (_selectedVehicleId.HasValue)
-                    {
-                        var selectedVehicle =
-                            _vehicles.FirstOrDefault(
-                                x => x.Id == _selectedVehicleId);
-
-                        @if (selectedVehicle?.OmnicommObjectId
-                            is { } omnicommObjectId)
-                        {
-                            <div class="form-text">
-                                Omnicomm ID:
-                                <strong>
-                                    @omnicommObjectId
-                                </strong>
-                            </div>
-                        }
-                    }
-
                 </div>
 
 
                 <div class="col-md-4">
+
+                    <label class="form-label">
+                        &nbsp;
+                    </label>
 
                     <button type="button"
                             class="btn btn-primary w-100"
@@ -107,11 +94,10 @@
 
                         @if (_loading)
                         {
-                            <span class="spinner-border spinner-border-sm me-2">
-                            </span>
+                            <span class="spinner-border spinner-border-sm me-2"></span>
                         }
 
-                        Загрузить LLD
+                        Загрузить таблицу
 
                     </button>
 
@@ -142,27 +128,90 @@
     {
         @foreach (var table in _tables)
         {
-            <div class="card mb-4">
+            var isExpanded =
+                _expandedTables.Contains(GetTableKey(table));
 
-                <div class="card-header">
+            <div class="card mb-3">
 
-                    <div class="d-flex justify-content-between align-items-center">
+                <div class="card-header p-0">
 
-                        <div>
+                    <div class="d-flex align-items-center">
 
-                            <strong>
-                                Датчик @table.SensorNumber
-                            </strong>
+                        <button type="button"
+                                class="btn btn-link text-decoration-none text-start flex-grow-1 px-3 py-3 lld-table-toggle"
+                                @onclick="() => ToggleTable(table)">
 
-                            <span class="text-muted ms-3">
-                                Бак @table.TankNumber
-                            </span>
+                            <div class="d-flex align-items-center">
 
-                        </div>
+                                <i class="bi @(isExpanded
+                                                               ? "bi-chevron-down"
+                                                               : "bi-chevron-right") me-3">
+                                </i>
 
-                        <div class="text-muted small">
-                            Terminal ID:
-                            @table.TerminalId
+                                <div>
+
+                                    <div class="fw-semibold">
+                                        Датчик @table.SensorNumber
+                                    </div>
+
+                                    <div class="small text-muted">
+
+                                        Бак @table.TankNumber
+
+                                        <span class="mx-2">•</span>
+
+                                        Terminal ID:
+                                        @table.TerminalId
+
+                                        <span class="mx-2">•</span>
+
+                                        Точек:
+                                        @table.Records.Count
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </button>
+
+
+                        <div class="d-flex align-items-center gap-2" style="margin-right: 10px;">
+
+                            <select class="form-select form-select-sm"
+                                    style="width: 180px;"
+                                    @bind="_volumeDigitsToRemove">
+
+                                <option value="0">
+                                    Без изменений
+                                </option>
+
+                                <option value="1">
+                                    1000 → 100
+                                </option>
+
+                                <option value="2">
+                                    1000 → 10
+                                </option>
+
+                                <option value="3">
+                                    1000 → 1
+                                </option>
+
+                            </select>
+
+                            <button type="button"
+                                    class="btn btn-sm btn-success"
+                                    @onclick="() => DownloadLldAsync(table)"
+                                    @onclick:stopPropagation="true">
+
+                                <i class="bi bi-download me-1"></i>
+
+                                Скачать ctb
+
+                            </button>
+
                         </div>
 
                     </div>
@@ -170,70 +219,59 @@
                 </div>
 
 
-                <div class="card-body p-0">
+                @if (isExpanded)
+                {
+                    <div class="card-body p-0">
 
-                    <div class="table-responsive">
+                        <div class="table-responsive">
 
-                        <table class="table table-hover mb-0">
+                            <table class="table table-hover align-middle mb-0">
 
-                            <thead class="table-light">
+                                <thead class="table-light">
 
-                                <tr>
-
-                                    <th>
-                                        Код ДУТ
-                                    </th>
-
-                                    <th>
-                                        Объём, л
-                                    </th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody>
-
-                                @foreach (var record in table.Records)
-                                {
                                     <tr>
 
-                                        <td>
-                                            @record.Code
-                                        </td>
+                                        <th>
+                                            Объём, л
+                                        </th>
 
-                                        <td>
-                                            @record.Liters.ToString("0.###")
-                                        </td>
+                                        <th>
+                                            Показание ДУТ
+                                        </th>
 
                                     </tr>
-                                }
 
-                            </tbody>
+                                </thead>
 
-                        </table>
+                                <tbody>
+
+                                    @foreach (var record in table.Records)
+                                    {
+                                        <tr>
+
+                                            <td>
+                                                @record.Liters.ToString(
+                                                    "0.###")
+                                            </td>
+
+                                            <td>
+                                                @record.Code
+                                            </td>
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
 
                     </div>
-
-                </div>
+                }
 
             </div>
         }
-
-
-        <div class="d-flex justify-content-end">
-
-            <button type="button"
-                    class="btn btn-success"
-                    @onclick="DownloadCsv">
-
-                <i class="bi bi-download me-1"></i>
-
-                Скачать CSV
-
-            </button>
-
-        </div>
     }
     else if (_loaded)
     {
@@ -269,6 +307,9 @@
 
     private string? _errorMessage;
 
+    private readonly HashSet<string> _expandedTables = [];
+
+    private int _volumeDigitsToRemove;
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,88 +407,120 @@
     }
 
 
-    private async Task DownloadCsv()
+    private async Task DownloadLldAsync(
+        LldCalibrationTable table)
     {
-        if (_tables.Count == 0)
-            return;
-
-        var csv =
-            BuildCsv();
+        var content =
+            BuildLldFile(
+                table,
+                _volumeDigitsToRemove);
 
         var bytes =
-            System.Text.Encoding.UTF8
-                .GetBytes(csv);
+            Encoding.UTF8.GetBytes(content);
 
         var base64 =
             Convert.ToBase64String(bytes);
 
         var fileName =
-            BuildFileName();
+            $"LLD_{table.TerminalId}_S{table.SensorNumber}_T{table.TankNumber}.ctb";
 
         await JSRuntime.InvokeVoidAsync(
             "fuelControl.downloadFile",
             fileName,
-            "text/csv;charset=utf-8",
+            "text/plain;charset=utf-8",
             base64);
     }
 
-
-    private string BuildCsv()
+    private string BuildLldFile(
+        LldCalibrationTable table,
+        int digitsToRemove)
     {
+        var records =
+            table.Records
+                .OrderBy(x => x.Liters)
+                .ToList();
+
+        if (records.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "LLD таблица не содержит записей.");
+        }
+
+        var scale =
+            GetVolumeScale(digitsToRemove);
+
+        var step =
+            records.Count > 1
+                ? (records[1].Liters - records[0].Liters) / scale
+                : 0m;
+
         var builder =
-            new System.Text.StringBuilder();
+            new StringBuilder();
 
         builder.AppendLine(
-            "Датчик;Бак;Terminal ID;Код ДУТ;Объем, л");
+            $"0;{FormatValue(step)};");
 
-        foreach (var table in _tables)
+        builder.AppendLine(
+            table.SensorNumber.ToString(
+                CultureInfo.InvariantCulture));
+
+        foreach (var record in records)
         {
-            foreach (var record in table.Records)
-            {
-                builder.AppendLine(
-                    string.Join(
-                        ';',
-                        table.SensorNumber,
-                        table.TankNumber,
-                        table.TerminalId,
-                        record.Code,
-                        record.Liters
-                            .ToString(
-                                "0.###",
-                                System.Globalization.CultureInfo.InvariantCulture)));
-            }
+            var volume =
+                record.Liters / scale;
+
+            builder.AppendLine(
+                $"{FormatValue(volume)};" +
+                record.Code.ToString(
+                    CultureInfo.InvariantCulture));
         }
 
         return builder.ToString();
     }
 
-
-    private string BuildFileName()
+    private static decimal GetVolumeScale(
+        int digitsToRemove)
     {
-        var vehicle =
-            _selectedVehicleId is { } id
-                ? _vehicles.FirstOrDefault(
-                    x => x.Id == id)
-                : null;
-
-        var name =
-            vehicle?.Name ?? "vehicle";
-
-        foreach (var invalidChar in
-                 Path.GetInvalidFileNameChars())
+        return digitsToRemove switch
         {
-            name =
-                name.Replace(
-                    invalidChar,
-                    '_');
-        }
+            0 => 1m,
+            1 => 10m,
+            2 => 100m,
+            3 => 1000m,
 
-        return $"LLD_{name}.csv";
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(digitsToRemove))
+        };
+    }
+
+    private static string FormatValue(
+        decimal value)
+    {
+        return Math.Truncate(value).ToString(
+            CultureInfo.InvariantCulture);
     }
 
 
     private void ClearError()
     {
         _errorMessage = null;
+    }
+
+    private static string GetTableKey(
+        LldCalibrationTable table)
+    {
+        return $"{table.TerminalId}:{table.SensorNumber}:{table.TankNumber}:{table.MultiTankNumber}";
+    }
+
+    private void ToggleTable(
+        LldCalibrationTable table)
+    {
+        var key =
+            GetTableKey(table);
+
+        if (!_expandedTables.Add(key))
+        {
+            _expandedTables.Remove(key);
+        }
     }
 }
