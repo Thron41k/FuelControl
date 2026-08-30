@@ -123,6 +123,9 @@ public static class DependencyInjection
         services.AddScoped<
             IUserAdministrationService,
             UserAdministrationService>();
+        services.AddScoped<
+            IUserAuthorizationService,
+            UserAuthorizationService>();
         return services;
     }
 }

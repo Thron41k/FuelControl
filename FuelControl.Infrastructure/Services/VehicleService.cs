@@ -10,7 +10,8 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class VehicleService(
     FuelControlDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization)
     : IVehicleService
 {
     public async Task<IReadOnlyList<Vehicle>> GetAllAsync(

@@ -2,12 +2,14 @@
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelingRecordService(
     FuelControlDbContext dbContext,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization)
     : IFuelingRecordService
 {
     public async Task<IReadOnlyList<FuelingRecord>> GetAllAsync(
@@ -16,6 +18,7 @@ public sealed class FuelingRecordService(
         Guid? fuelTruckId = null,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(cancellationToken);
         var localStart = date.ToDateTime(
             TimeOnly.MinValue);
 
@@ -66,6 +69,8 @@ public sealed class FuelingRecordService(
         Guid? vehicleId = null,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
         if (to < from)
         {
             throw new ArgumentException(
@@ -110,6 +115,8 @@ public sealed class FuelingRecordService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
         return await dbContext.FuelingRecords
             .AsNoTracking()
             .Include(x => x.FuelTruck)
@@ -133,6 +140,8 @@ public sealed class FuelingRecordService(
         int counterEnd,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
         var userId = GetCurrentUserId();
 
         var fuelTruck = await dbContext.FuelTrucks
@@ -194,6 +203,8 @@ public sealed class FuelingRecordService(
         int counterEnd,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
         var userId = GetCurrentUserId();
 
         var fuelingRecord = await dbContext.FuelingRecords
@@ -254,7 +265,8 @@ public sealed class FuelingRecordService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        _ = GetCurrentUserId();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
         var fuelingRecord = await dbContext.FuelingRecords
             .SingleOrDefaultAsync(
