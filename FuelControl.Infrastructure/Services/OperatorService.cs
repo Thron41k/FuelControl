@@ -1,5 +1,4 @@
-﻿
-using FuelControl.Domain.Entities;
+﻿using FuelControl.Domain.Entities;
 using FuelControl.Infrastructure.Identity;
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
@@ -11,26 +10,36 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class OperatorService(
     FuelControlDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization)
     : IOperatorService
 {
     public async Task<IReadOnlyList<Operator>> GetAllAsync(
         bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetRequiredUserAsync();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
-        var query = dbContext.Operators
-            .AsNoTracking()
-            .Include(x => x.Branch)
-            .AsQueryable();
+        var user =
+            await GetRequiredUserAsync();
+
+        var query =
+            dbContext.Operators
+                .AsNoTracking()
+                .Include(x => x.Branch)
+                .AsQueryable();
 
         if (!includeInactive)
         {
-            query = query.Where(x => x.IsActive);
+            query =
+                query.Where(x => x.IsActive);
         }
 
-        if (await userManager.IsInRoleAsync(user, Roles.Admin))
+        // Admin видит всех водителей.
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
         {
             return await query
                 .OrderBy(x => x.Branch.Name)
@@ -38,21 +47,20 @@ public sealed class OperatorService(
                 .ToListAsync(cancellationToken);
         }
 
-        if (!await userManager.IsInRoleAsync(user, Roles.Dispatcher))
-        {
-            return [];
-        }
-
+        // Dispatcher и Moderator видят только
+        // водителей своего филиала.
         if (user.BranchId is null)
         {
             return [];
         }
 
         return await query
-            .Where(x => x.BranchId == user.BranchId.Value)
+            .Where(x =>
+                x.BranchId == user.BranchId.Value)
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
     }
+
 
     public async Task<Guid> CreateAsync(
         string fullName,
@@ -61,22 +69,25 @@ public sealed class OperatorService(
         string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetRequiredUserAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var targetBranchId = await ResolveBranchForWriteAsync(
-            user,
-            branchId);
+        var user =
+            await GetRequiredUserAsync();
 
-        var normalizedFullName = NormalizeFullName(fullName);
-        var normalizedRfidTagId =
-            NormalizeRfidTagId(rfidTagId);
+        var targetBranchId =
+            await ResolveBranchForWriteAsync(
+                user,
+                branchId);
+
+        var normalizedFullName =
+            NormalizeFullName(fullName);
+
         var normalizedPersonnelNumber =
             NormalizePersonnelNumber(personnelNumber);
 
-        await EnsureRfidTagIsAvailableAsync(
-            normalizedRfidTagId,
-            null,
-            cancellationToken);
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
 
         await EnsureFullNameIsAvailableAsync(
             normalizedFullName,
@@ -84,18 +95,27 @@ public sealed class OperatorService(
             null,
             cancellationToken);
 
-        var @operator = new Operator(
-            normalizedFullName,
-            targetBranchId,
-            normalizedPersonnelNumber,
-            normalizedRfidTagId);
+        await EnsureRfidTagIsAvailableAsync(
+            normalizedRfidTagId,
+            null,
+            cancellationToken);
 
-        dbContext.Operators.Add(@operator);
+        var @operator =
+            new Operator(
+                normalizedFullName,
+                targetBranchId,
+                normalizedPersonnelNumber,
+                normalizedRfidTagId);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.Operators.Add(
+            @operator);
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return @operator.Id;
     }
+
 
     public async Task UpdateAsync(
         Guid id,
@@ -105,22 +125,27 @@ public sealed class OperatorService(
         string? rfidTagId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetRequiredUserAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var @operator = await dbContext.Operators
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
+        var user =
+            await GetRequiredUserAsync();
+
+        var @operator =
+            await dbContext.Operators
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Водитель не найден.");
 
-        var isAdmin = await userManager.IsInRoleAsync(
-            user,
-            Roles.Admin);
-
         Guid targetBranchId;
 
-        if (isAdmin)
+        // Admin может редактировать водителя
+        // любого филиала и менять филиал.
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
         {
             if (branchId is null)
             {
@@ -129,38 +154,40 @@ public sealed class OperatorService(
                     nameof(branchId));
             }
 
-            targetBranchId = branchId.Value;
+            targetBranchId =
+                branchId.Value;
         }
         else
         {
-            if (!await userManager.IsInRoleAsync(
-                    user,
-                    Roles.Dispatcher))
-            {
-                throw new UnauthorizedAccessException();
-            }
-
             if (user.BranchId is null)
             {
                 throw new UnauthorizedAccessException(
                     "Для пользователя не назначен филиал.");
             }
 
-            if (@operator.BranchId != user.BranchId.Value)
+            // Moderator не может редактировать
+            // водителя другого филиала.
+            if (@operator.BranchId !=
+                user.BranchId.Value)
             {
                 throw new UnauthorizedAccessException(
                     "Водитель относится к другому филиалу.");
             }
 
-            // Никогда не доверяем branchId,
-            // пришедшему от Dispatcher из браузера.
-            targetBranchId = user.BranchId.Value;
+            // branchId из браузера для Moderator
+            // полностью игнорируем.
+            targetBranchId =
+                user.BranchId.Value;
         }
-        var normalizedRfidTagId =
-            NormalizeRfidTagId(rfidTagId);
-        var normalizedFullName = NormalizeFullName(fullName);
+
+        var normalizedFullName =
+            NormalizeFullName(fullName);
+
         var normalizedPersonnelNumber =
             NormalizePersonnelNumber(personnelNumber);
+
+        var normalizedRfidTagId =
+            NormalizeRfidTagId(rfidTagId);
 
         await EnsureFullNameIsAvailableAsync(
             normalizedFullName,
@@ -179,82 +206,96 @@ public sealed class OperatorService(
             normalizedPersonnelNumber,
             normalizedRfidTagId);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
+
 
     public async Task SetActiveAsync(
         Guid id,
         bool isActive,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetRequiredUserAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var @operator = await dbContext.Operators
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
+        var user =
+            await GetRequiredUserAsync();
+
+        var @operator =
+            await dbContext.Operators
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Водитель не найден.");
 
-        var isAdmin = await userManager.IsInRoleAsync(
-            user,
-            Roles.Admin);
-
-        if (isAdmin)
-        {
-            SetOperatorState(@operator, isActive);
-
-            await dbContext.SaveChangesAsync(
-                cancellationToken);
-
-            return;
-        }
-
+        // Admin может менять состояние водителя
+        // любого филиала.
         if (!await userManager.IsInRoleAsync(
                 user,
-                Roles.Dispatcher))
+                Roles.Admin))
         {
-            throw new UnauthorizedAccessException();
+            if (user.BranchId is null)
+            {
+                throw new UnauthorizedAccessException(
+                    "Для пользователя не назначен филиал.");
+            }
+
+            if (@operator.BranchId !=
+                user.BranchId.Value)
+            {
+                throw new UnauthorizedAccessException(
+                    "Водитель относится к другому филиалу.");
+            }
         }
 
-        if (user.BranchId is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
-        }
-
-        if (@operator.BranchId != user.BranchId.Value)
-        {
-            throw new UnauthorizedAccessException(
-                "Водитель относится к другому филиалу.");
-        }
-
-        SetOperatorState(@operator, isActive);
+        SetOperatorState(
+            @operator,
+            isActive);
 
         await dbContext.SaveChangesAsync(
             cancellationToken);
     }
 
+
     public async Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetRequiredUserAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
+        var user =
+            await GetRequiredUserAsync();
+
+        var @operator =
+            await dbContext.Operators
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Водитель не найден.");
+
+        // Moderator может удалить только водителя
+        // своего филиала.
         if (!await userManager.IsInRoleAsync(
                 user,
                 Roles.Admin))
         {
-            throw new UnauthorizedAccessException(
-                "Только администратор может удалить водителя.");
-        }
+            if (user.BranchId is null)
+            {
+                throw new UnauthorizedAccessException(
+                    "Для пользователя не назначен филиал.");
+            }
 
-        var @operator = await dbContext.Operators
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
-            ?? throw new InvalidOperationException(
-                "Водитель не найден.");
+            if (@operator.BranchId !=
+                user.BranchId.Value)
+            {
+                throw new UnauthorizedAccessException(
+                    "Водитель относится к другому филиалу.");
+            }
+        }
 
         if (@operator.IsActive)
         {
@@ -263,11 +304,12 @@ public sealed class OperatorService(
                 "Сначала деактивируйте его.");
         }
 
-        var hasFuelingRecords = await dbContext
-            .Set<FuelingRecord>()
-            .AnyAsync(
-                x => x.OperatorId == id,
-                cancellationToken);
+        var hasFuelingRecords =
+            await dbContext
+                .Set<FuelingRecord>()
+                .AnyAsync(
+                    x => x.OperatorId == id,
+                    cancellationToken);
 
         if (hasFuelingRecords)
         {
@@ -276,15 +318,19 @@ public sealed class OperatorService(
                 "поскольку с ним связаны записи заправок.");
         }
 
-        dbContext.Operators.Remove(@operator);
+        dbContext.Operators.Remove(
+            @operator);
 
         await dbContext.SaveChangesAsync(
             cancellationToken);
     }
 
-    private async Task<ApplicationUser> GetRequiredUserAsync()
+
+    private async Task<ApplicationUser>
+        GetRequiredUserAsync()
     {
-        if (currentUserService.UserId is not { } userId)
+        if (currentUserService.UserId
+            is not { } userId)
         {
             throw new UnauthorizedAccessException(
                 "Пользователь не авторизован.");
@@ -296,10 +342,13 @@ public sealed class OperatorService(
                    "Пользователь не найден.");
     }
 
-    private async Task<Guid> ResolveBranchForWriteAsync(
-        ApplicationUser user,
-        Guid? requestedBranchId)
+
+    private async Task<Guid>
+        ResolveBranchForWriteAsync(
+            ApplicationUser user,
+            Guid? requestedBranchId)
     {
+        // Admin может выбрать любой филиал.
         if (await userManager.IsInRoleAsync(
                 user,
                 Roles.Admin))
@@ -314,37 +363,34 @@ public sealed class OperatorService(
             return requestedBranchId.Value;
         }
 
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Dispatcher))
-        {
-            throw new UnauthorizedAccessException();
-        }
-
+        // Для Moderator берём филиал
+        // непосредственно из текущего пользователя.
         if (user.BranchId is null)
         {
             throw new UnauthorizedAccessException(
                 "Для пользователя не назначен филиал.");
         }
 
-        // requestedBranchId намеренно игнорируется.
         return user.BranchId.Value;
     }
 
-    private async Task EnsureFullNameIsAvailableAsync(
-        string fullName,
-        Guid branchId,
-        Guid? excludedOperatorId,
-        CancellationToken cancellationToken)
+
+    private async Task
+        EnsureFullNameIsAvailableAsync(
+            string fullName,
+            Guid branchId,
+            Guid? excludedOperatorId,
+            CancellationToken cancellationToken)
     {
-        var exists = await dbContext.Operators
-            .AnyAsync(
-                x =>
-                    x.BranchId == branchId &&
-                    x.FullName == fullName &&
-                    (excludedOperatorId == null ||
-                     x.Id != excludedOperatorId.Value),
-                cancellationToken);
+        var exists =
+            await dbContext.Operators
+                .AnyAsync(
+                    x =>
+                        x.BranchId == branchId &&
+                        x.FullName == fullName &&
+                        (excludedOperatorId == null ||
+                         x.Id != excludedOperatorId.Value),
+                    cancellationToken);
 
         if (exists)
         {
@@ -353,6 +399,90 @@ public sealed class OperatorService(
                 "с таким ФИО.");
         }
     }
+
+
+    private async Task
+        EnsureRfidTagIsAvailableAsync(
+            string? rfidTagId,
+            Guid? excludedOperatorId,
+            CancellationToken cancellationToken)
+    {
+        if (rfidTagId is null)
+        {
+            return;
+        }
+
+        var operatorExists =
+            await dbContext.Operators
+                .AnyAsync(
+                    x =>
+                        x.RfidTagId == rfidTagId &&
+                        (excludedOperatorId == null ||
+                         x.Id != excludedOperatorId.Value),
+                    cancellationToken);
+
+        if (operatorExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена другому водителю.");
+        }
+
+        var vehicleExists =
+            await dbContext.Vehicles
+                .AnyAsync(
+                    x => x.RfidTagId == rfidTagId,
+                    cancellationToken);
+
+        if (vehicleExists)
+        {
+            throw new InvalidOperationException(
+                "RFID метка уже назначена технике.");
+        }
+    }
+
+
+    private static string
+        NormalizeFullName(
+            string fullName)
+    {
+        if (string.IsNullOrWhiteSpace(
+                fullName))
+        {
+            throw new ArgumentException(
+                "Необходимо указать ФИО водителя.",
+                nameof(fullName));
+        }
+
+        return fullName.Trim();
+    }
+
+
+    private static string?
+        NormalizePersonnelNumber(
+            string? personnelNumber)
+    {
+        return string.IsNullOrWhiteSpace(
+                personnelNumber)
+            ? null
+            : personnelNumber.Trim();
+    }
+
+
+    private static string?
+        NormalizeRfidTagId(
+            string? rfidTagId)
+    {
+        if (string.IsNullOrWhiteSpace(
+                rfidTagId))
+        {
+            return null;
+        }
+
+        return rfidTagId
+            .Trim()
+            .ToUpperInvariant();
+    }
+
 
     private static void SetOperatorState(
         Operator @operator,
@@ -367,70 +497,4 @@ public sealed class OperatorService(
             @operator.Deactivate();
         }
     }
-
-    private static string NormalizeFullName(string fullName)
-    {
-        if (string.IsNullOrWhiteSpace(fullName))
-        {
-            throw new ArgumentException(
-                "Необходимо указать ФИО водителя.",
-                nameof(fullName));
-        }
-
-        return fullName.Trim();
-    }
-
-    private static string? NormalizePersonnelNumber(
-        string? personnelNumber)
-    {
-        return string.IsNullOrWhiteSpace(personnelNumber)
-            ? null
-            : personnelNumber.Trim();
-    }
-
-    private async Task EnsureRfidTagIsAvailableAsync(
-        string? rfidTagId,
-        Guid? excludedOperatorId,
-        CancellationToken cancellationToken)
-    {
-        if (rfidTagId is null)
-            return;
-
-        var operatorExists =
-            await dbContext.Operators.AnyAsync(
-                x =>
-                    x.RfidTagId == rfidTagId &&
-                    (excludedOperatorId == null ||
-                     x.Id != excludedOperatorId.Value),
-                cancellationToken);
-
-        if (operatorExists)
-        {
-            throw new InvalidOperationException(
-                "RFID метка уже назначена другому водителю.");
-        }
-
-        var vehicleExists =
-            await dbContext.Vehicles.AnyAsync(
-                x => x.RfidTagId == rfidTagId,
-                cancellationToken);
-
-        if (vehicleExists)
-        {
-            throw new InvalidOperationException(
-                "RFID метка уже назначена технике.");
-        }
-    }
-
-    private static string? NormalizeRfidTagId(
-        string? rfidTagId)
-    {
-        if (string.IsNullOrWhiteSpace(rfidTagId))
-            return null;
-
-        return rfidTagId
-            .Trim()
-            .ToUpperInvariant();
-    }
 }
-
