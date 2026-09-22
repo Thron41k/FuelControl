@@ -2,13 +2,11 @@
 using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Net;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelingRecordService(
     FuelControlDbContext dbContext,
-    ICurrentUserService currentUserService,
     IUserAuthorizationService authorization)
     : IFuelingRecordService
 {
@@ -18,14 +16,17 @@ public sealed class FuelingRecordService(
         Guid? fuelTruckId = null,
         CancellationToken cancellationToken = default)
     {
-        await authorization.EnsureDispatcherAsync(cancellationToken);
-        var localStart = date.ToDateTime(
-            TimeOnly.MinValue);
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
-        var localEnd = date
-            .AddDays(1)
-            .ToDateTime(
+        var localStart =
+            date.ToDateTime(
                 TimeOnly.MinValue);
+
+        var localEnd =
+            date.AddDays(1)
+                .ToDateTime(
+                    TimeOnly.MinValue);
 
         var utcStart =
             new DateTimeOffset(
@@ -39,17 +40,34 @@ public sealed class FuelingRecordService(
                     timeZone.GetUtcOffset(localEnd))
                 .ToUniversalTime();
 
-        var query = dbContext.FuelingRecords
-            .AsNoTracking()
-            .Include(x => x.FuelTruck)
-            .ThenInclude(x => x.Vehicle)
-            .Include(x => x.Vehicle)
-            .Include(x => x.Operator)
-            .Include(x => x.UssRecords)
-            .Include(x => x.OmnicommRecord)
-            .Where(x =>
-                x.FuelingDateTime >= utcStart &&
-                x.FuelingDateTime < utcEnd);
+        var query =
+            dbContext.FuelingRecords
+                .AsNoTracking()
+                .Include(x => x.FuelTruck)
+                    .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Vehicle)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.Operator)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.UssRecords)
+                .Include(x => x.OmnicommRecord)
+                .Where(x =>
+                    x.FuelingDateTime >= utcStart &&
+                    x.FuelingDateTime < utcEnd);
+
+        var branchId =
+            await authorization.GetCurrentUserBranchIdAsync(
+                cancellationToken);
+
+        if (branchId is not null &&
+            !await authorization.IsAdminAsync(
+                cancellationToken))
+        {
+            query = query.Where(x =>
+                x.FuelTruck.Vehicle.BranchId == branchId.Value &&
+                x.Vehicle.BranchId == branchId.Value &&
+                x.Operator.BranchId == branchId.Value);
+        }
 
         if (fuelTruckId.HasValue)
         {
@@ -71,42 +89,70 @@ public sealed class FuelingRecordService(
     {
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
+
         if (to < from)
         {
             throw new ArgumentException(
                 "Дата окончания периода не может быть раньше даты начала.");
         }
 
-        var localStart = from.ToDateTime(
-            TimeOnly.MinValue);
+        var localStart =
+            from.ToDateTime(
+                TimeOnly.MinValue);
 
-        var localEnd = to
-            .AddDays(1)
-            .ToDateTime(TimeOnly.MinValue);
+        var localEnd =
+            to.AddDays(1)
+                .ToDateTime(
+                    TimeOnly.MinValue);
 
-        var utcStart = new DateTimeOffset(
-                localStart,
-                timeZone.GetUtcOffset(localStart))
-            .ToUniversalTime();
+        var utcStart =
+            new DateTimeOffset(
+                    localStart,
+                    timeZone.GetUtcOffset(localStart))
+                .ToUniversalTime();
 
-        var utcEnd = new DateTimeOffset(
-                localEnd,
-                timeZone.GetUtcOffset(localEnd))
-            .ToUniversalTime();
+        var utcEnd =
+            new DateTimeOffset(
+                    localEnd,
+                    timeZone.GetUtcOffset(localEnd))
+                .ToUniversalTime();
 
-        return await dbContext.FuelingRecords
-            .AsNoTracking()
-            .Include(x => x.FuelTruck)
-            .ThenInclude(x => x.Vehicle)
-            .Include(x => x.Vehicle)
-            .Include(x => x.Operator)
-            .Include(x => x.UssRecords)
-            .Include(x => x.OmnicommRecord)
-            .Where(x =>
-                x.FuelingDateTime >= utcStart &&
-                x.FuelingDateTime < utcEnd &&
-                (!vehicleId.HasValue ||
-                 x.VehicleId == vehicleId.Value))
+        var query =
+            dbContext.FuelingRecords
+                .AsNoTracking()
+                .Include(x => x.FuelTruck)
+                    .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Vehicle)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.Operator)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.UssRecords)
+                .Include(x => x.OmnicommRecord)
+                .Where(x =>
+                    x.FuelingDateTime >= utcStart &&
+                    x.FuelingDateTime < utcEnd);
+
+        var branchId =
+            await authorization.GetCurrentUserBranchIdAsync(
+                cancellationToken);
+
+        if (branchId is not null &&
+            !await authorization.IsAdminAsync(
+                cancellationToken))
+        {
+            query = query.Where(x =>
+                x.FuelTruck.Vehicle.BranchId == branchId.Value &&
+                x.Vehicle.BranchId == branchId.Value &&
+                x.Operator.BranchId == branchId.Value);
+        }
+
+        if (vehicleId.HasValue)
+        {
+            query = query.Where(x =>
+                x.VehicleId == vehicleId.Value);
+        }
+
+        return await query
             .OrderBy(x => x.FuelingDateTime)
             .ToListAsync(cancellationToken);
     }
@@ -117,17 +163,32 @@ public sealed class FuelingRecordService(
     {
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
-        return await dbContext.FuelingRecords
-            .AsNoTracking()
-            .Include(x => x.FuelTruck)
-                .ThenInclude(x => x.Vehicle)
-            .Include(x => x.Vehicle)
-            .Include(x => x.Operator)
-            .Include(x => x.UssRecords)
-            .Include(x => x.OmnicommRecord)
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken);
+
+        var record =
+            await dbContext.FuelingRecords
+                .AsNoTracking()
+                .Include(x => x.FuelTruck)
+                    .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Vehicle)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.Operator)
+                    .ThenInclude(x => x.Branch)
+                .Include(x => x.UssRecords)
+                .Include(x => x.OmnicommRecord)
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken);
+
+        if (record is null)
+        {
+            return null;
+        }
+
+        await EnsureRecordAccessAsync(
+            record,
+            cancellationToken);
+
+        return record;
     }
 
     public async Task<Guid> CreateAsync(
@@ -142,52 +203,68 @@ public sealed class FuelingRecordService(
     {
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
-        var userId = GetCurrentUserId();
 
-        var fuelTruck = await dbContext.FuelTrucks
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                x => x.Id == fuelTruckId,
-                cancellationToken)
+        var userId =
+            await authorization.GetCurrentUserIdAsync(
+                cancellationToken);
+
+        var fuelTruck =
+            await dbContext.FuelTrucks
+                .AsNoTracking()
+                .Include(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelTruckId,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Топливозаправщик не найден.");
 
-        var vehicleExists = await dbContext.Vehicles
-            .AnyAsync(
-                x => x.Id == vehicleId,
-                cancellationToken);
+        await authorization.EnsureBranchAccessAsync(
+            fuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
-        if (!vehicleExists)
-        {
-            throw new InvalidOperationException(
+        var vehicle =
+            await dbContext.Vehicles
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.Id == vehicleId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Техника не найдена.");
-        }
 
-        var operatorExists = await dbContext.Operators
-            .AnyAsync(
-                x => x.Id == operatorId &&
-                     x.IsActive,
-                cancellationToken);
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
 
-        if (!operatorExists)
-        {
-            throw new InvalidOperationException(
+        var @operator =
+            await dbContext.Operators
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.Id == operatorId &&
+                         x.IsActive,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Водитель не найден или отключён.");
-        }
 
-        var fuelingRecord = new FuelingRecord(
-            fuelTruckId,
-            vehicleId,
-            operatorId,
-            fuelingDateTime,
-            volume,
-            counterStart,
-            counterEnd,
-            userId);
+        await authorization.EnsureBranchAccessAsync(
+            @operator.BranchId,
+            cancellationToken);
 
-        dbContext.FuelingRecords.Add(fuelingRecord);
+        var fuelingRecord =
+            new FuelingRecord(
+                fuelTruckId,
+                vehicleId,
+                operatorId,
+                fuelingDateTime,
+                volume,
+                counterStart,
+                counterEnd,
+                userId);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.FuelingRecords.Add(
+            fuelingRecord);
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return fuelingRecord.Id;
     }
@@ -205,48 +282,65 @@ public sealed class FuelingRecordService(
     {
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
-        var userId = GetCurrentUserId();
 
-        var fuelingRecord = await dbContext.FuelingRecords
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
+        var userId =
+            await authorization.GetCurrentUserIdAsync(
+                cancellationToken);
+
+        var fuelingRecord =
+            await dbContext.FuelingRecords
+                .Include(x => x.FuelTruck)
+                    .ThenInclude(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Заправка не найдена.");
 
-        var fuelTruckExists = await dbContext.FuelTrucks
-            .AnyAsync(
-                x => x.Id == fuelTruckId,
-                cancellationToken);
+        await EnsureRecordAccessAsync(
+            fuelingRecord,
+            cancellationToken);
 
-        if (!fuelTruckExists)
-        {
-            throw new InvalidOperationException(
+        var fuelTruck =
+            await dbContext.FuelTrucks
+                .AsNoTracking()
+                .Include(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelTruckId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Топливозаправщик не найден.");
-        }
 
-        var vehicleExists = await dbContext.Vehicles
-            .AnyAsync(
-                x => x.Id == vehicleId,
-                cancellationToken);
+        await authorization.EnsureBranchAccessAsync(
+            fuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
-        if (!vehicleExists)
-        {
-            throw new InvalidOperationException(
+        var vehicle =
+            await dbContext.Vehicles
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.Id == vehicleId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Техника не найдена.");
-        }
 
-        var operatorExists = await dbContext.Operators
-            .AnyAsync(
-                x => x.Id == operatorId &&
-                     x.IsActive,
-                cancellationToken);
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
 
-        if (!operatorExists)
-        {
-            throw new InvalidOperationException(
+        var @operator =
+            await dbContext.Operators
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.Id == operatorId &&
+                         x.IsActive,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Водитель не найден или отключён.");
-        }
+
+        await authorization.EnsureBranchAccessAsync(
+            @operator.BranchId,
+            cancellationToken);
 
         fuelingRecord.Update(
             fuelTruckId,
@@ -258,36 +352,50 @@ public sealed class FuelingRecordService(
             counterEnd,
             userId);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
 
     public async Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        await authorization.EnsureDispatcherAsync(
+        await authorization.EnsureModeratorAsync(
             cancellationToken);
 
-        var fuelingRecord = await dbContext.FuelingRecords
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
+        var fuelingRecord =
+            await dbContext.FuelingRecords
+                .Include(x => x.FuelTruck)
+                    .ThenInclude(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == id,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Заправка не найдена.");
 
-        dbContext.FuelingRecords.Remove(fuelingRecord);
+        await EnsureRecordAccessAsync(
+            fuelingRecord,
+            cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.FuelingRecords.Remove(
+            fuelingRecord);
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
 
-    private Guid GetCurrentUserId()
+    private async Task EnsureRecordAccessAsync(
+        FuelingRecord record,
+        CancellationToken cancellationToken)
     {
-        if (currentUserService.UserId is not { } userId)
+        if (await authorization.IsAdminAsync(
+                cancellationToken))
         {
-            throw new UnauthorizedAccessException(
-                "Пользователь не авторизован.");
+            return;
         }
 
-        return userId;
+        await authorization.EnsureBranchAccessAsync(
+            record.FuelTruck.Vehicle.BranchId,
+            cancellationToken);
     }
 }

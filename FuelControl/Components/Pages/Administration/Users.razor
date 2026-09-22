@@ -153,6 +153,12 @@
                                                 Администратор
                                             </span>
                                         }
+                                        else if (user.Role == Roles.Moderator)
+                                        {
+                                            <span class="badge text-bg-warning">
+                                                Модератор
+                                            </span>
+                                        }
                                         else if (user.Role == Roles.Dispatcher)
                                         {
                                             <span class="badge text-bg-secondary">
@@ -373,6 +379,10 @@
 
                             <option value="@Roles.Dispatcher">
                                 Диспетчер
+                            </option>
+
+                            <option value="@Roles.Moderator">
+                                Модератор
                             </option>
 
                             <option value="@Roles.Admin">

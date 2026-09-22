@@ -8,6 +8,7 @@ namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommFuelingSyncService(
     FuelControlDbContext dbContext,
+    IUserAuthorizationService authorization,
     IOmnicommFuelingService omnicommFuelingService,
     IOmnicommFuelingMatcher matcher)
     : IOmnicommFuelingSyncService
@@ -17,9 +18,16 @@ public sealed class OmnicommFuelingSyncService(
         DateOnly to,
         Guid? vehicleId,
         TimeZoneInfo userTimeZone,
-        Guid matchedBy,
         CancellationToken cancellationToken = default)
     {
+
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
+        var matchedBy =
+            await authorization.GetCurrentUserIdAsync(
+                cancellationToken);
+
         ArgumentNullException.ThrowIfNull(userTimeZone);
 
         if (matchedBy == Guid.Empty)

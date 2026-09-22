@@ -1,12 +1,16 @@
-﻿using System.Globalization;
-using System.Text.Json;
+﻿using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Omnicomm.Tools.Lld.Models;
 using FuelControl.Omnicomm.Vehicles;
+using System.Globalization;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommLldService(
+    IUserAuthorizationService authorization,
+    FuelControlDbContext dbContext,
     IOmnicommVehicleProfileClient profileClient)
     : IOmnicommLldService
 {
@@ -14,6 +18,22 @@ public sealed class OmnicommLldService(
         long omnicommObjectId,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
+
+        var vehicle =
+            await dbContext.Vehicles
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.OmnicommObjectId == omnicommObjectId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Техника с указанным OmnicommObjectId не найдена.");
+
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
+
         var profile =
             await profileClient.GetAsync(
                 omnicommObjectId,

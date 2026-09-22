@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using FuelControl.Omnicomm.Vehicles.Models
 
-@attribute [Authorize(Roles = Roles.Admin)]
+@attribute [Authorize(Roles = Roles.DispatcherOrHigher)]
 
 @inject IVehicleService VehicleService
 @inject IBranchService BranchService
@@ -24,11 +24,18 @@
             </div>
         </div>
 
-        <button class="btn btn-primary"
-                @onclick="OpenCreateDialog">
-            <span class="bi bi-plus-lg me-1"></span>
-            Добавить
-        </button>
+        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+            <button class="btn btn-primary"
+                    @onclick="OpenCreateDialog">
+
+                <span class="bi bi-plus-lg me-1"></span>
+
+                Добавить
+
+            </button>
+
+        </AuthorizeView>
     </div>
 
     <div class="card shadow-sm">
@@ -214,51 +221,62 @@
 
                                 </td>
 
-                                <td class="text-end">
+                                <AuthorizeView Roles="@Roles.ModeratorOrHigher">
 
-                                    <div class="btn-group">
+                                    <ChildContent>
 
-                                        <button class="btn btn-sm btn-outline-primary"
-                                                @onclick="() => OpenEditDialog(vehicle)">
-                                            <span class="bi bi-pencil"></span>
-                                            Изменить
-                                        </button>
+                                        <td class="text-end">
 
-                                        @if (vehicle.IsActive)
-                                        {
-                                            <button class="btn btn-sm btn-outline-danger"
-                                                    @onclick="() => Deactivate(vehicle)">
-                                                <span class="bi bi-power"></span>
-                                                Отключить
-                                            </button>
-                                        }
-                                        else
-                                        {
-                                            <button class="btn btn-sm btn-outline-success"
-                                                    @onclick="() => Activate(vehicle)">
-                                                <span class="bi bi-power"></span>
-                                                Включить
-                                            </button>
-                                        }
-                                        @if (!vehicle.IsActive)
-                                        {
-                                            <AuthorizeView Roles="@Roles.Admin">
-                                                <ChildContent Context="adminContext">
+                                            <div class="btn-group">
+
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => OpenEditDialog(vehicle)">
+
+                                                    <span class="bi bi-pencil"></span>
+
+                                                    Изменить
+
+                                                </button>
+
+                                                @if (vehicle.IsActive)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => Deactivate(vehicle)">
+
+                                                        <span class="bi bi-power"></span>
+
+                                                        Отключить
+
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-success"
+                                                            @onclick="() => Activate(vehicle)">
+
+                                                        <span class="bi bi-power"></span>
+
+                                                        Включить
+
+                                                    </button>
 
                                                     <button class="btn btn-sm btn-outline-danger"
                                                             @onclick="() => OpenDeleteDialog(vehicle)">
 
                                                         <span class="bi bi-trash"></span>
+
                                                         Удалить
 
                                                     </button>
+                                                }
 
-                                                </ChildContent>
-                                            </AuthorizeView>
-                                        }
-                                    </div>
+                                            </div>
 
-                                </td>
+                                        </td>
+
+                                    </ChildContent>
+
+                                </AuthorizeView>
 
                             </tr>
                         }
@@ -515,8 +533,8 @@
 
                         
                         
-                        <AuthorizeView Roles="@Roles.Admin">
-                            <ChildContent Context="adminContext">
+                        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+                            <ChildContent>
 
                                 <div class="mb-3">
 
@@ -542,33 +560,37 @@
                                                placeholder="Идентификатор RFID метки" />
 
                                 </div>
+                                <AuthorizeView Roles="@Roles.Admin">
 
-                                <div class="mb-3">
+                                    <ChildContent>
+                                        <div class="mb-3">
 
-                                    <label class="form-label">
-                                        Филиал
-                                    </label>
+                                            <label class="form-label">
+                                                Филиал
+                                            </label>
 
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="_editModel.BranchId">
+                                            <InputSelect class="form-select"
+                                                         @bind-Value="_editModel.BranchId">
 
-                                        <option value="">
-                                            Выберите филиал
-                                        </option>
+                                                <option value="">
+                                                    Выберите филиал
+                                                </option>
 
-                                        @foreach (var branch in _branches)
-                                        {
-                                            <option value="@branch.Id">
-                                                @branch.Name
-                                            </option>
-                                        }
+                                                @foreach (var branch in _branches)
+                                                {
+                                                    <option value="@branch.Id">
+                                                        @branch.Name
+                                                    </option>
+                                                }
 
-                                    </InputSelect>
+                                            </InputSelect>
 
-                                    <ValidationMessage For="() => _editModel.BranchId" />
+                                            <ValidationMessage For="() => _editModel.BranchId" />
 
-                                </div>
+                                        </div>
+                                    </ChildContent>
 
+                                </AuthorizeView>
                             </ChildContent>
                         </AuthorizeView>
 
@@ -577,23 +599,25 @@
                     <div class="modal-footer">
                         @if (_editingVehicle is null)
                         {
-                            <button type="button"
-                                    class="btn btn-outline-primary me-auto"
-                                    @onclick="ImportFromOmnicomm"
-                                    disabled="@_isImporting">
+                            <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+                                <button type="button"
+                                        class="btn btn-outline-primary me-auto"
+                                        @onclick="ImportFromOmnicomm"
+                                        disabled="@_isImporting">
 
-                                @if (_isImporting)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-1"
-                                          role="status">
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="bi bi-cloud-download me-1">Импортировать из Omnicomm</span>
-                                }
+                                    @if (_isImporting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"
+                                              role="status">
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="bi bi-cloud-download me-1">Импортировать из Omnicomm</span>
+                                    }
 
-                            </button>
+                                </button>
+                            </AuthorizeView>
                         }
                         <button type="button"
                                 class="btn btn-secondary"

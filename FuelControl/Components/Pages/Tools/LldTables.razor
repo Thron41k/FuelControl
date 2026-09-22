@@ -1,6 +1,7 @@
 ﻿@page "/tools/lld"
 @rendermode InteractiveServer
 
+@attribute [Authorize(Roles = Roles.ModeratorOrHigher)]
 
 @using System.Globalization
 @using System.Text

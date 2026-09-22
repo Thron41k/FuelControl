@@ -4,57 +4,182 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-fuelcontrol navbar-fuelcontrol">
     <div class="container-fluid">
-        <a class="navbar-brand" href="/">FuelControl</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+
+        <a class="navbar-brand" href="/">
+            FuelControl
+        </a>
+
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarNav"
+                aria-controls="navbarNav"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+
             <span class="navbar-toggler-icon"></span>
+
         </button>
 
-        <div class="collapse navbar-collapse" id="navbarNav">
+        <div class="collapse navbar-collapse"
+             id="navbarNav">
+
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 align-items-center">
-                <li class="nav-item">
-                    <NavLink class="nav-link" href="/fueling-records" Match="NavLinkMatch.Prefix">
-                        <span class="bi bi-list-ul" aria-hidden="true"></span> Просмотр заправок
-                    </NavLink>
-                </li>
-                <li class="nav-item">
-                    <NavLink class="nav-link" href="/refuels/add">
-                        <span class="bi bi-plus-circle" aria-hidden="true"></span> Добавление заправок
-                    </NavLink>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle @(_isToolsDropdownActive ? "active" : "")"
-                       href="#" id="toolsDropdown" role="button"
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="bi bi-book" aria-hidden="true"></span> Инструменты
-                    </a>
-                    <ul class="dropdown-menu"
-                        aria-labelledby="toolsDropdown">
 
-                        <li>
-                            <NavLink class="dropdown-item"
-                                     href="/tools/lld">
-                                <span class="bi bi-table me-1"></span>
-                                LLD таблицы
-                            </NavLink>
-                        </li>
+                <AuthorizeView Roles="@Roles.DispatcherOrHigher">
 
-                    </ul>
-                </li>
-                <AuthorizeView Roles="@Roles.Admin">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle @(_isDropdownActive ? "active" : "")"
-                           href="#" id="navbarDropdown" role="button"
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            <span class="bi bi-book" aria-hidden="true"></span> Справочники
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                            <li><NavLink class="dropdown-item" href="/fuel-trucks">Топливозаправщики</NavLink></li>
-                            <li><NavLink class="dropdown-item" href="/drivers">Водители</NavLink></li>
-                            <li><NavLink class="dropdown-item" href="/vehicles">Техника</NavLink></li>
-                            <li><NavLink class="dropdown-item" href="/branches">Филиалы</NavLink></li>
-                        </ul>
+                    <li class="nav-item">
+
+                        <NavLink class="nav-link"
+                                 href="/fueling-records"
+                                 Match="NavLinkMatch.Prefix">
+
+                            <span class="bi bi-list-ul"
+                                  aria-hidden="true">
+                            </span>
+
+                            Просмотр заправок
+
+                        </NavLink>
+
                     </li>
+
+                    <li class="nav-item">
+
+                        <NavLink class="nav-link"
+                                 href="/refuels/add">
+
+                            <span class="bi bi-plus-circle"
+                                  aria-hidden="true">
+                            </span>
+
+                            Добавление заправок
+
+                        </NavLink>
+
+                    </li>
+
+                </AuthorizeView>
+
+
+                <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+                    <li class="nav-item dropdown">
+
+                        <a class="nav-link dropdown-toggle @(_isToolsDropdownActive ? "active" : "")"
+                           href="#"
+                           id="toolsDropdown"
+                           role="button"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false">
+
+                            <span class="bi bi-tools me-1"
+                                  aria-hidden="true">
+                            </span>
+
+                            Инструменты
+
+                        </a>
+
+                        <ul class="dropdown-menu"
+                            aria-labelledby="toolsDropdown">
+
+                            <li>
+
+                                <NavLink class="dropdown-item"
+                                         href="/tools/lld">
+
+                                    <span class="bi bi-table me-1">
+                                    </span>
+
+                                    LLD таблицы
+
+                                </NavLink>
+
+                            </li>
+
+                        </ul>
+
+                    </li>
+
+                </AuthorizeView>
+
+
+                <AuthorizeView Roles="@Roles.DispatcherOrHigher">
+
+                    <li class="nav-item dropdown">
+
+                        <a class="nav-link dropdown-toggle @(_isDropdownActive ? "active" : "")"
+                           href="#"
+                           id="navbarDropdown"
+                           role="button"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false">
+
+                            <span class="bi bi-journal-text me-1"
+                                  aria-hidden="true">
+                            </span>
+
+                            Справочники
+
+                        </a>
+
+                        <ul class="dropdown-menu"
+                            aria-labelledby="navbarDropdown">
+
+                            <li>
+
+                                <NavLink class="dropdown-item"
+                                         href="/fuel-trucks">
+
+                                    Топливозаправщики
+
+                                </NavLink>
+
+                            </li>
+
+                            <li>
+
+                                <NavLink class="dropdown-item"
+                                         href="/drivers">
+
+                                    Водители
+
+                                </NavLink>
+
+                            </li>
+
+                            <li>
+
+                                <NavLink class="dropdown-item"
+                                         href="/vehicles">
+
+                                    Техника
+
+                                </NavLink>
+
+                            </li>
+
+                            <li>
+
+                                <NavLink class="dropdown-item"
+                                         href="/branches">
+
+                                    Филиалы
+
+                                </NavLink>
+
+                            </li>
+
+                        </ul>
+
+                    </li>
+
+                </AuthorizeView>
+
+
+                <AuthorizeView Roles="@Roles.Admin">
+
                     <li class="nav-item dropdown">
 
                         <a class="nav-link dropdown-toggle @(_isAdministrationDropdownActive ? "active" : "")"
@@ -64,7 +189,10 @@
                            data-bs-toggle="dropdown"
                            aria-expanded="false">
 
-                            <span class="bi bi-shield-lock me-1"></span>
+                            <span class="bi bi-shield-lock me-1"
+                                  aria-hidden="true">
+                            </span>
+
                             Администрирование
 
                         </a>
@@ -77,7 +205,9 @@
                                 <NavLink class="dropdown-item"
                                          href="/administration/users">
 
-                                    <span class="bi bi-people me-1"></span>
+                                    <span class="bi bi-people me-1">
+                                    </span>
+
                                     Пользователи
 
                                 </NavLink>
@@ -87,82 +217,179 @@
                         </ul>
 
                     </li>
+
                 </AuthorizeView>
+
             </ul>
 
+
             <ul class="navbar-nav align-items-center">
+
                 <AuthorizeView>
+
                     <Authorized>
+
                         <li class="nav-item me-2">
+
                             <span class="navbar-text text-light">
-                                <span class="bi bi-person-fill" aria-hidden="true"></span>
+
+                                <span class="bi bi-person-fill"
+                                      aria-hidden="true">
+                                </span>
+
                                 @context.User.Identity?.Name
+
                             </span>
+
                         </li>
+
+
                         <li class="nav-item">
-                            <form action="Account/Logout" method="post" class="d-inline">
+
+                            <form action="Account/Logout"
+                                  method="post"
+                                  class="d-inline">
+
                                 <AntiforgeryToken />
-                                <input type="hidden" name="ReturnUrl" value="@_currentUrl" />
-                                <button type="submit" class="btn btn-outline-light btn-sm">
-                                    <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Выход
+
+                                <input type="hidden"
+                                       name="ReturnUrl"
+                                       value="@_currentUrl" />
+
+                                <button type="submit"
+                                        class="btn btn-outline-light btn-sm">
+
+                                    <span class="bi bi-box-arrow-right"
+                                          aria-hidden="true">
+                                    </span>
+
+                                    Выход
+
                                 </button>
+
                             </form>
+
                         </li>
+
                     </Authorized>
+
+
                     <NotAuthorized>
+
                         <li class="nav-item">
-                            <NavLink class="nav-link text-light" href="Account/Register">
-                                <span class="bi bi-person-plus" aria-hidden="true"></span> Регистрация
+
+                            <NavLink class="nav-link text-light"
+                                     href="Account/Register">
+
+                                <span class="bi bi-person-plus"
+                                      aria-hidden="true">
+                                </span>
+
+                                Регистрация
+
                             </NavLink>
+
                         </li>
+
+
                         <li class="nav-item">
-                            <NavLink class="nav-link text-light" href="Account/Login">
-                                <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Вход
+
+                            <NavLink class="nav-link text-light"
+                                     href="Account/Login">
+
+                                <span class="bi bi-box-arrow-in-right"
+                                      aria-hidden="true">
+                                </span>
+
+                                Вход
+
                             </NavLink>
+
                         </li>
+
                     </NotAuthorized>
+
                 </AuthorizeView>
+
             </ul>
+
         </div>
+
     </div>
 </nav>
 
-@code {
+@code
+{
     private string? _currentUrl;
+
     private bool _isDropdownActive;
+
     private bool _isToolsDropdownActive;
+
     private bool _isAdministrationDropdownActive;
+
+
     protected override void OnInitialized()
     {
-        _currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-        NavigationManager.LocationChanged += OnLocationChanged;
+        _currentUrl =
+            NavigationManager.ToBaseRelativePath(
+                NavigationManager.Uri);
+
+        NavigationManager.LocationChanged +=
+            OnLocationChanged;
+
         UpdateDropdownState();
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+
+    private void OnLocationChanged(
+        object? sender,
+        LocationChangedEventArgs e)
     {
-        _currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        _currentUrl =
+            NavigationManager.ToBaseRelativePath(
+                e.Location);
+
         UpdateDropdownState();
+
         StateHasChanged();
     }
 
+
     private void UpdateDropdownState()
     {
-        _isDropdownActive = _currentUrl?.StartsWith("tankers") == true ||
-                           _currentUrl?.StartsWith("drivers") == true ||
-                           _currentUrl?.StartsWith("vehicles") == true;
+        _isDropdownActive =
+            _currentUrl?.StartsWith(
+                "fuel-trucks",
+                StringComparison.OrdinalIgnoreCase) == true
+            ||
+            _currentUrl?.StartsWith(
+                "drivers",
+                StringComparison.OrdinalIgnoreCase) == true
+            ||
+            _currentUrl?.StartsWith(
+                "vehicles",
+                StringComparison.OrdinalIgnoreCase) == true
+            ||
+            _currentUrl?.StartsWith(
+                "branches",
+                StringComparison.OrdinalIgnoreCase) == true;
+
         _isToolsDropdownActive =
-            _currentUrl?.StartsWith("tools/", StringComparison.OrdinalIgnoreCase)
-            == true;
+            _currentUrl?.StartsWith(
+                "tools/",
+                StringComparison.OrdinalIgnoreCase) == true;
+
         _isAdministrationDropdownActive =
             _currentUrl?.StartsWith(
                 "administration/",
-                StringComparison.OrdinalIgnoreCase)
-            == true;
+                StringComparison.OrdinalIgnoreCase) == true;
     }
+
 
     public void Dispose()
     {
-        NavigationManager.LocationChanged -= OnLocationChanged;
+        NavigationManager.LocationChanged -=
+            OnLocationChanged;
     }
 }

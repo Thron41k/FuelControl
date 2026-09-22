@@ -11,12 +11,16 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class BranchService(
     FuelControlDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization)
     : IBranchService
 {
     public async Task<IReadOnlyList<Branch>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
         return await dbContext.Set<Branch>()
             .AsNoTracking()
             .OrderBy(x => x.Name)
@@ -27,6 +31,9 @@ public sealed class BranchService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
         return await dbContext.Set<Branch>()
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -38,7 +45,8 @@ public sealed class BranchService(
         string name,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
         name = NormalizeName(name);
 
@@ -57,7 +65,8 @@ public sealed class BranchService(
 
         dbContext.Set<Branch>().Add(branch);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return branch.Id;
     }
@@ -66,7 +75,8 @@ public sealed class BranchService(
         IReadOnlyList<OmnicommBranchImportModel> branches,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
         foreach (var item in branches)
         {
@@ -95,18 +105,22 @@ public sealed class BranchService(
 
             if (localBranch is not null)
             {
-                localBranch.SetOmnicommId(item.OmnicommId);
+                localBranch.SetOmnicommId(
+                    item.OmnicommId);
+
                 continue;
             }
 
             var newBranch = new Branch(name);
 
-            newBranch.SetOmnicommId(item.OmnicommId);
+            newBranch.SetOmnicommId(
+                item.OmnicommId);
 
             dbContext.Set<Branch>().Add(newBranch);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
 
     public async Task UpdateAsync(
@@ -114,7 +128,8 @@ public sealed class BranchService(
         string name,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
         name = NormalizeName(name);
 
@@ -139,14 +154,16 @@ public sealed class BranchService(
 
         branch.Rename(name);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
 
     public async Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
         var branch = await dbContext.Set<Branch>()
             .SingleOrDefaultAsync(
@@ -185,7 +202,7 @@ public sealed class BranchService(
         if (hasOperators)
         {
             throw new InvalidOperationException(
-                "Нельзя удалить филиал, к которому привязаны машинисты.");
+                "Нельзя удалить филиал, к которому привязаны водители.");
         }
 
         var hasUsers = await userManager.Users
@@ -201,10 +218,41 @@ public sealed class BranchService(
 
         dbContext.Set<Branch>().Remove(branch);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
     }
 
-    private async Task EnsureAdminAsync()
+    public async Task<IReadOnlyList<Branch>> GetAvailableForCurrentUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
+        var user = await GetRequiredUserAsync();
+
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            return await dbContext.Set<Branch>()
+                .AsNoTracking()
+                .OrderBy(x => x.Name)
+                .ToListAsync(cancellationToken);
+        }
+
+        if (user.BranchId is null)
+        {
+            return [];
+        }
+
+        return await dbContext.Set<Branch>()
+            .AsNoTracking()
+            .Where(x => x.Id == user.BranchId.Value)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<ApplicationUser> GetRequiredUserAsync()
     {
         if (currentUserService.UserId is not { } userId)
         {
@@ -212,22 +260,10 @@ public sealed class BranchService(
                 "Пользователь не авторизован.");
         }
 
-        var user = await userManager.FindByIdAsync(
-            userId.ToString());
-
-        if (user is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не найден.");
-        }
-
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            throw new UnauthorizedAccessException(
-                "Недостаточно прав для выполнения операции.");
-        }
+        return await userManager.FindByIdAsync(
+                   userId.ToString())
+               ?? throw new UnauthorizedAccessException(
+                   "Пользователь не найден.");
     }
 
     private static string NormalizeName(string name)
@@ -240,53 +276,5 @@ public sealed class BranchService(
         }
 
         return name.Trim();
-    }
-
-    public async Task<IReadOnlyList<Branch>> GetAvailableForCurrentUserAsync(
-        CancellationToken cancellationToken = default)
-    {
-        if (currentUserService.UserId is not { } userId)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не авторизован.");
-        }
-
-        var user = await userManager.FindByIdAsync(
-            userId.ToString());
-
-        if (user is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не найден.");
-        }
-
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            return await dbContext.Set<Branch>()
-                .AsNoTracking()
-                .OrderBy(x => x.Name)
-                .ToListAsync(cancellationToken);
-        }
-
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Dispatcher))
-        {
-            if (user.BranchId is null)
-            {
-                return [];
-            }
-
-            return await dbContext.Set<Branch>()
-                .AsNoTracking()
-                .Where(x => x.Id == user.BranchId.Value)
-                .OrderBy(x => x.Name)
-                .ToListAsync(cancellationToken);
-        }
-
-        throw new UnauthorizedAccessException(
-            "Недостаточно прав для просмотра филиалов.");
     }
 }

@@ -1,6 +1,6 @@
 @page "/drivers"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = Roles.Admin)]
+@attribute [Authorize(Roles = Roles.DispatcherOrHigher)]
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
@@ -19,15 +19,19 @@
             Водители
         </h3>
 
-        <button type="button"
-                class="btn btn-primary"
-                @onclick="OpenCreateDialog">
+        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
 
-            <span class="bi bi-plus-lg me-1"></span>
+            <button type="button"
+                    class="btn btn-primary"
+                    @onclick="OpenCreateDialog">
 
-            Добавить водителя
+                <span class="bi bi-plus-lg me-1"></span>
 
-        </button>
+                Добавить водителя
+
+            </button>
+
+        </AuthorizeView>
 
     </div>
 
@@ -158,40 +162,62 @@
                                         }
                                     </td>
 
-                                    <td class="text-end">
+                                    <AuthorizeView Roles="@Roles.ModeratorOrHigher">
 
-                                       
-                                        <div class="btn-group">
+                                        <ChildContent>
 
-                                            <button class="btn btn-sm btn-outline-primary"
-                                                    @onclick="() => OpenEditDialog(driver)">
-                                                <span class="bi bi-pencil"></span>
-                                                Изменить
-                                            </button>
-                                            @if (driver.IsActive)
-                                            {
-                                                <button class="btn btn-sm btn-outline-danger"
-                                                        @onclick="() => SetDriverActive(driver.Id, false)">
-                                                    <span class="bi bi-pencil"></span>
-                                                    Отключить
-                                                </button>
-                                            }
-                                            else
-                                            {
-                                                <button class="btn btn-sm btn-outline-success"
-                                                        @onclick="() => SetDriverActive(driver.Id, true)">
-                                                    <span class="bi bi-pencil"></span>
-                                                    Включить
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger"
-                                                        @onclick="() => ConfirmDeleteDriver(driver)">
-                                                    <span class="bi bi-pencil"></span>
-                                                    Удалить
-                                                </button>
-                                            }
+                                            <td class="text-end">
 
-                                        </div>
-                                    </td>
+                                                <div class="btn-group">
+
+                                                    <button class="btn btn-sm btn-outline-primary"
+                                                            @onclick="() => OpenEditDialog(driver)">
+
+                                                        <span class="bi bi-pencil"></span>
+
+                                                        Изменить
+
+                                                    </button>
+
+                                                    @if (driver.IsActive)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-danger"
+                                                                @onclick="() => SetDriverActive(driver.Id, false)">
+
+                                                            <span class="bi bi-power"></span>
+
+                                                            Отключить
+
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-success"
+                                                                @onclick="() => SetDriverActive(driver.Id, true)">
+
+                                                            <span class="bi bi-power"></span>
+
+                                                            Включить
+
+                                                        </button>
+
+                                                        <button class="btn btn-sm btn-outline-danger"
+                                                                @onclick="() => ConfirmDeleteDriver(driver)">
+
+                                                            <span class="bi bi-trash"></span>
+
+                                                            Удалить
+
+                                                        </button>
+                                                    }
+
+                                                </div>
+
+                                            </td>
+
+                                        </ChildContent>
+
+                                    </AuthorizeView>
 
                                 </tr>
                             }

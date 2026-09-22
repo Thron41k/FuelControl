@@ -10,20 +10,40 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class FuelTruckService(
     FuelControlDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization)
     : IFuelTruckService
 {
     public async Task<IReadOnlyList<FuelTruck>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
-        return await dbContext.Set<FuelTruck>()
+        var user = await GetRequiredUserAsync();
+
+        var query = dbContext.Set<FuelTruck>()
             .AsNoTracking()
             .Include(x => x.Vehicle)
             .ThenInclude(x => x.Branch)
             .Include(x => x.UssVehicle)
             .Include(x => x.TankVehicle)
+            .AsQueryable();
+
+        if (!await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            if (user.BranchId is null)
+            {
+                return [];
+            }
+
+            query = query.Where(
+                x => x.Vehicle.BranchId == user.BranchId.Value);
+        }
+
+        return await query
             .OrderBy(x => x.Vehicle.Name)
             .ToListAsync(cancellationToken);
     }
@@ -31,16 +51,34 @@ public sealed class FuelTruckService(
     public async Task<IReadOnlyList<Vehicle>> GetAvailableVehiclesAsync(
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        return await dbContext.Vehicles
+        var user = await GetRequiredUserAsync();
+
+        var query = dbContext.Vehicles
             .AsNoTracking()
             .Where(vehicle =>
                 vehicle.IsActive &&
                 !dbContext.Set<FuelTruck>()
-                    .Any(
-                        x => x.VehicleId == vehicle.Id))
+                    .Any(x => x.VehicleId == vehicle.Id))
             .Include(x => x.Branch)
+            .AsQueryable();
+
+        if (!await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            if (user.BranchId is null)
+            {
+                return [];
+            }
+
+            query = query.Where(
+                x => x.BranchId == user.BranchId.Value);
+        }
+
+        return await query
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }
@@ -49,19 +87,22 @@ public sealed class FuelTruckService(
         Guid vehicleId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var vehicleExists = await dbContext.Vehicles
-            .AnyAsync(
+        var user = await GetRequiredUserAsync();
+
+        var vehicle = await dbContext.Vehicles
+            .SingleOrDefaultAsync(
                 x => x.Id == vehicleId &&
                      x.IsActive,
-                cancellationToken);
-
-        if (!vehicleExists)
-        {
-            throw new InvalidOperationException(
+                cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Техника не найдена или неактивна.");
-        }
+
+        await EnsureVehicleBelongsToUserScopeAsync(
+            vehicle.BranchId,
+            user);
 
         var alreadyExists = await dbContext
             .Set<FuelTruck>()
@@ -75,16 +116,15 @@ public sealed class FuelTruckService(
                 "Эта техника уже назначена топливозаправщиком.");
         }
 
-        var fuelTruckVehicle = new FuelTruck(
-            vehicleId);
+        var fuelTruck = new FuelTruck(vehicleId);
 
         dbContext.Set<FuelTruck>()
-            .Add(fuelTruckVehicle);
+            .Add(fuelTruck);
 
         await dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return fuelTruckVehicle.Id;
+        return fuelTruck.Id;
     }
 
     public async Task UpdateAsync(
@@ -92,27 +132,35 @@ public sealed class FuelTruckService(
         Guid vehicleId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var fuelTruckVehicle = await dbContext
+        var user = await GetRequiredUserAsync();
+
+        var fuelTruck = await dbContext
             .Set<FuelTruck>()
+            .Include(x => x.Vehicle)
             .SingleOrDefaultAsync(
                 x => x.Id == id,
                 cancellationToken)
             ?? throw new InvalidOperationException(
                 "Топливозаправщик не найден.");
 
-        var vehicleExists = await dbContext.Vehicles
-            .AnyAsync(
+        await EnsureVehicleBelongsToUserScopeAsync(
+            fuelTruck.Vehicle.BranchId,
+            user);
+
+        var vehicle = await dbContext.Vehicles
+            .SingleOrDefaultAsync(
                 x => x.Id == vehicleId &&
                      x.IsActive,
-                cancellationToken);
-
-        if (!vehicleExists)
-        {
-            throw new InvalidOperationException(
+                cancellationToken)
+            ?? throw new InvalidOperationException(
                 "Техника не найдена или неактивна.");
-        }
+
+        await EnsureVehicleBelongsToUserScopeAsync(
+            vehicle.BranchId,
+            user);
 
         var alreadyAssigned = await dbContext
             .Set<FuelTruck>()
@@ -124,73 +172,13 @@ public sealed class FuelTruckService(
         if (alreadyAssigned)
         {
             throw new InvalidOperationException(
-                "Эта техника уже назначена другим " +
-                "топливозаправщиком.");
+                "Эта техника уже назначена другим топливозаправщиком.");
         }
 
-        fuelTruckVehicle.ChangeVehicle(vehicleId);
+        fuelTruck.ChangeVehicle(vehicleId);
 
         await dbContext.SaveChangesAsync(
             cancellationToken);
-    }
-
-    public async Task DeleteAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await EnsureAdminAsync();
-
-        var fuelTruckVehicle = await dbContext
-            .Set<FuelTruck>()
-            .SingleOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken)
-            ?? throw new InvalidOperationException(
-                "Топливозаправщик не найден.");
-        var hasFuelingRecords = await dbContext
-            .Set<FuelingRecord>()
-            .AnyAsync(
-                x => x.VehicleId == fuelTruckVehicle.VehicleId,
-                cancellationToken);
-
-        if (hasFuelingRecords)
-        {
-            throw new InvalidOperationException(
-                "Нельзя удалить топливозаправщик, " +
-                "поскольку с этой техникой связаны записи заправок.");
-        }
-        dbContext.Set<FuelTruck>()
-            .Remove(fuelTruckVehicle);
-
-        await dbContext.SaveChangesAsync(
-            cancellationToken);
-    }
-
-    private async Task EnsureAdminAsync()
-    {
-        if (currentUserService.UserId is not { } userId)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не авторизован.");
-        }
-
-        var user = await userManager.FindByIdAsync(
-            userId.ToString());
-
-        if (user is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не найден.");
-        }
-
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            throw new UnauthorizedAccessException(
-                "Только администратор может управлять " +
-                "топливозаправщиками.");
-        }
     }
 
     public async Task SetOmnicommVehiclesAsync(
@@ -199,24 +187,35 @@ public sealed class FuelTruckService(
         Guid? tankVehicleId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync();
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
 
-        var fuelTruck =
-            await dbContext.FuelTrucks
-                .SingleOrDefaultAsync(
-                    x => x.Id == fuelTruckId,
-                    cancellationToken)
+        var user = await GetRequiredUserAsync();
+
+        var fuelTruck = await dbContext.FuelTrucks
+            .Include(x => x.Vehicle)
+            .SingleOrDefaultAsync(
+                x => x.Id == fuelTruckId,
+                cancellationToken)
             ?? throw new InvalidOperationException(
                 "Топливозаправщик не найден.");
+
+        await EnsureVehicleBelongsToUserScopeAsync(
+            fuelTruck.Vehicle.BranchId,
+            user);
 
         await ValidateOmnicommVehicleAsync(
             ussVehicleId,
             "УСС",
+            fuelTruck.Vehicle.BranchId,
+            user,
             cancellationToken);
 
         await ValidateOmnicommVehicleAsync(
             tankVehicleId,
             "емкости",
+            fuelTruck.Vehicle.BranchId,
+            user,
             cancellationToken);
 
         fuelTruck.SetUssVehicle(
@@ -229,27 +228,83 @@ public sealed class FuelTruckService(
             cancellationToken);
     }
 
+    public async Task DeleteAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        await authorization.EnsureModeratorAsync(
+            cancellationToken);
+
+        var user = await GetRequiredUserAsync();
+
+        var fuelTruck = await dbContext
+            .Set<FuelTruck>()
+            .Include(x => x.Vehicle)
+            .SingleOrDefaultAsync(
+                x => x.Id == id,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Топливозаправщик не найден.");
+
+        await EnsureVehicleBelongsToUserScopeAsync(
+            fuelTruck.Vehicle.BranchId,
+            user);
+
+        var hasFuelingRecords = await dbContext
+            .Set<FuelingRecord>()
+            .AnyAsync(
+                x => x.FuelTruckId == id,
+                cancellationToken);
+
+        if (hasFuelingRecords)
+        {
+            throw new InvalidOperationException(
+                "Нельзя удалить топливозаправщик, " +
+                "поскольку с ним связаны записи заправок.");
+        }
+
+        dbContext.Set<FuelTruck>()
+            .Remove(fuelTruck);
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
+    }
+
     private async Task ValidateOmnicommVehicleAsync(
         Guid? vehicleId,
         string purpose,
+        Guid fuelTruckBranchId,
+        ApplicationUser user,
         CancellationToken cancellationToken)
     {
         if (!vehicleId.HasValue)
+        {
             return;
+        }
 
-        var vehicle =
-            await dbContext.Vehicles
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
-                    x => x.Id == vehicleId.Value &&
-                         x.IsActive,
-                    cancellationToken);
+        var vehicle = await dbContext.Vehicles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                x => x.Id == vehicleId.Value &&
+                     x.IsActive,
+                cancellationToken);
 
         if (vehicle is null)
         {
             throw new InvalidOperationException(
-                $"Техника для назначения «{purpose}» не найдена " +
-                "или неактивна.");
+                $"Техника для назначения «{purpose}» " +
+                "не найдена или неактивна.");
+        }
+
+        await EnsureVehicleBelongsToUserScopeAsync(
+            vehicle.BranchId,
+            user);
+
+        if (vehicle.BranchId != fuelTruckBranchId)
+        {
+            throw new InvalidOperationException(
+                $"Техника для назначения «{purpose}» " +
+                "должна относиться к тому же филиалу.");
         }
 
         if (vehicle.OmnicommObjectId is null)
@@ -258,5 +313,43 @@ public sealed class FuelTruckService(
                 $"У выбранной техники для назначения «{purpose}» " +
                 "не указан OmnicommObjectId.");
         }
+    }
+
+    private async Task EnsureVehicleBelongsToUserScopeAsync(
+        Guid branchId,
+        ApplicationUser user)
+    {
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            return;
+        }
+
+        if (user.BranchId is null)
+        {
+            throw new UnauthorizedAccessException(
+                "Для пользователя не назначен филиал.");
+        }
+
+        if (branchId != user.BranchId.Value)
+        {
+            throw new UnauthorizedAccessException(
+                "Техника относится к другому филиалу.");
+        }
+    }
+
+    private async Task<ApplicationUser> GetRequiredUserAsync()
+    {
+        if (currentUserService.UserId is not { } userId)
+        {
+            throw new UnauthorizedAccessException(
+                "Пользователь не авторизован.");
+        }
+
+        return await userManager.FindByIdAsync(
+                   userId.ToString())
+               ?? throw new UnauthorizedAccessException(
+                   "Пользователь не найден.");
     }
 }

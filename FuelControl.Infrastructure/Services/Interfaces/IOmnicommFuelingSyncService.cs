@@ -9,6 +9,5 @@ public interface IOmnicommFuelingSyncService
         DateOnly to,
         Guid? vehicleId,
         TimeZoneInfo userTimeZone,
-        Guid matchedBy,
         CancellationToken cancellationToken = default);
 }

@@ -9,7 +9,7 @@ namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelingUssService(
     FuelControlDbContext dbContext,
-    ICurrentUserService currentUserService,
+    IUserAuthorizationService authorization,
     IOmnicommReportClient omnicommReportClient)
     : IFuelingUssService
 {
@@ -19,17 +19,22 @@ public sealed class FuelingUssService(
         OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
-        _ = GetCurrentUserId();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
         var fuelTruck = await dbContext.FuelTrucks
-            .AsNoTracking()
-            .Include(x => x.Vehicle)
-            .Include(x => x.UssVehicle)
-            .SingleOrDefaultAsync(
-                x => x.Id == fuelTruckId,
-                cancellationToken)
-            ?? throw new InvalidOperationException(
-                "Топливозаправщик не найден.");
+                            .AsNoTracking()
+                            .Include(x => x.Vehicle)
+                            .Include(x => x.UssVehicle)
+                            .SingleOrDefaultAsync(
+                                x => x.Id == fuelTruckId,
+                                cancellationToken)
+                        ?? throw new InvalidOperationException(
+                            "Топливозаправщик не найден.");
+
+        await authorization.EnsureBranchAccessAsync(
+            fuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
         if (fuelTruck.Vehicle is null)
         {
@@ -92,7 +97,23 @@ public sealed class FuelingUssService(
         Guid fuelingRecordId,
         CancellationToken cancellationToken = default)
     {
-        _ = GetCurrentUserId();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
+        var fuelingRecord =
+            await dbContext.FuelingRecords
+                .AsNoTracking()
+                .Include(x => x.FuelTruck)
+                .ThenInclude(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelingRecordId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Заправка не найдена.");
+
+        await authorization.EnsureBranchAccessAsync(
+            fuelingRecord.FuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
         return await dbContext.FuelingUssRecords
             .AsNoTracking()
@@ -107,7 +128,12 @@ public sealed class FuelingUssService(
         OmnicommTimeZone? timeZone,
         CancellationToken cancellationToken = default)
     {
-        var userId = GetCurrentUserId();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
+        var userId =
+            await authorization.GetCurrentUserIdAsync(
+                cancellationToken);
 
         ArgumentNullException.ThrowIfNull(omnicommEventIds);
 
@@ -122,18 +148,19 @@ public sealed class FuelingUssService(
                 nameof(omnicommEventIds));
         }
 
-        //var fuelingRecord = await dbContext.FuelingRecords
-        //    .SingleOrDefaultAsync(
-        //        x => x.Id == fuelingRecordId,
-        //        cancellationToken)
-        //    ?? throw new InvalidOperationException(
-        //        "Заправка не найдена.");
-        var fuelingRecord = await dbContext.FuelingRecords
-                                .SingleOrDefaultAsync(
-                                    x => x.Id == fuelingRecordId,
-                                    cancellationToken)
-                            ?? throw new InvalidOperationException(
-                                "Заправка не найдена.");
+        var fuelingRecord =
+            await dbContext.FuelingRecords
+                .Include(x => x.FuelTruck)
+                .ThenInclude(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelingRecordId,
+                    cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Заправка не найдена.");
+
+        await authorization.EnsureBranchAccessAsync(
+            fuelingRecord.FuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
         var fuelTruck = await dbContext.FuelTrucks
                             .AsNoTracking()
@@ -247,29 +274,27 @@ public sealed class FuelingUssService(
         Guid fuelingUssRecordId,
         CancellationToken cancellationToken = default)
     {
-        _ = GetCurrentUserId();
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
 
-        var ussRecord = await dbContext.FuelingUssRecords
-            .SingleOrDefaultAsync(
-                x => x.Id == fuelingUssRecordId,
-                cancellationToken)
+        var ussRecord =
+            await dbContext.FuelingUssRecords
+                .Include(x => x.FuelingRecord)
+                .ThenInclude(x => x.FuelTruck)
+                .ThenInclude(x => x.Vehicle)
+                .SingleOrDefaultAsync(
+                    x => x.Id == fuelingUssRecordId,
+                    cancellationToken)
             ?? throw new InvalidOperationException(
                 "Показание УСС не найдено.");
+
+        await authorization.EnsureBranchAccessAsync(
+            ussRecord.FuelingRecord.FuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
         dbContext.FuelingUssRecords.Remove(ussRecord);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private Guid GetCurrentUserId()
-    {
-        if (currentUserService.UserId is not { } userId)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не авторизован.");
-        }
-
-        return userId;
     }
 
     private static DateOnly GetDateInTimeZone(DateTimeOffset dateTime, OmnicommTimeZone timeZone)

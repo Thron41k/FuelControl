@@ -1,17 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace FuelControl.Infrastructure.Identity;
 
-namespace FuelControl.Infrastructure.Identity
+public static class Roles
 {
-    public static class Roles
-    {
-        public const string Admin = "Admin";
-        public const string Dispatcher = "Dispatcher";
-        public const string Moderator = "Moderator";
+    public const string Admin = "Admin";
+    public const string Dispatcher = "Dispatcher";
+    public const string Moderator = "Moderator";
 
-        public static readonly string[] All = [Admin, Dispatcher,Moderator];
-    }
+    public const string ModeratorOrHigher =
+        $"{Moderator},{Admin}";
+
+    public const string DispatcherOrHigher =
+        $"{Dispatcher},{Moderator},{Admin}";
+
+    public static readonly string[] All =
+    [
+        Admin,
+        Dispatcher,
+        Moderator
+    ];
 }

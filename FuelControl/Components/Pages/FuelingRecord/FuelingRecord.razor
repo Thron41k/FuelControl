@@ -3,6 +3,7 @@
 
 @using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
 @using FuelControl.Infrastructure.Services.Models
 @using FuelControl.Omnicomm.Reports.Models
@@ -422,11 +423,18 @@ else
                                                 <span class="bi bi-pencil"></span>
                                                 Изменить
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger"
-                                                    @onclick="() => OpenDeleteDialog(record)">
-                                                <span class="bi bi-trash"></span>
-                                                Удалить
-                                            </button>
+                                            <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        @onclick="() => OpenDeleteDialog(record)">
+
+                                                    <span class="bi bi-trash"></span>
+
+                                                    Удалить
+
+                                                </button>
+
+                                            </AuthorizeView>
                                         </td>
 
                                     </tr>

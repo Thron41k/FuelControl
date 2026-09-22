@@ -11,6 +11,7 @@ namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelTruckTankLevelService(
     FuelControlDbContext dbContext,
+    IUserAuthorizationService authorization,
     IOmnicommReportClient omnicommReportClient,
     IOptions<FuelTruckTankLevelOptions> options)
     : IFuelTruckTankLevelService
@@ -25,6 +26,9 @@ public sealed class FuelTruckTankLevelService(
         OmnicommTimeZone timeZone,
         CancellationToken cancellationToken = default)
     {
+        await authorization.EnsureDispatcherAsync(
+            cancellationToken);
+
         if (fuelTruckId == Guid.Empty)
         {
             throw new ArgumentException(
@@ -43,12 +47,17 @@ public sealed class FuelTruckTankLevelService(
         var fuelTruck =
             await dbContext.FuelTrucks
                 .AsNoTracking()
+                .Include(x => x.Vehicle)
                 .Include(x => x.TankVehicle)
                 .SingleOrDefaultAsync(
                     x => x.Id == fuelTruckId,
                     cancellationToken)
             ?? throw new InvalidOperationException(
                 "Топливозаправщик не найден.");
+
+        await authorization.EnsureBranchAccessAsync(
+            fuelTruck.Vehicle.BranchId,
+            cancellationToken);
 
         if (fuelTruck.TankVehicleId is not { } tankVehicleId)
         {

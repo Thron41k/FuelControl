@@ -17,4 +17,17 @@ public interface IUserAuthorizationService
     Task<bool> IsInRoleAsync(
         string role,
         CancellationToken cancellationToken = default);
+
+    Task<bool> IsAdminAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<Guid> GetCurrentUserIdAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<Guid?> GetCurrentUserBranchIdAsync(
+        CancellationToken cancellationToken = default);
+
+    Task EnsureBranchAccessAsync(
+        Guid branchId,
+        CancellationToken cancellationToken = default);
 }

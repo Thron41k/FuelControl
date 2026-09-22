@@ -1,6 +1,6 @@
 ﻿@page "/branches"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = Roles.Admin)]
+@attribute [Authorize(Roles = Roles.DispatcherOrHigher)]
 @using FuelControl.Domain.Entities
 @using FuelControl.Infrastructure.Identity
 @using FuelControl.Infrastructure.Services.Interfaces
@@ -29,8 +29,9 @@
             </div>
         </div>
 
-        <AuthorizeView Roles="@Roles.Admin">
-            <ChildContent Context="adminContext">
+        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+            <ChildContent>
 
                 <div class="d-flex gap-2">
 
@@ -55,6 +56,7 @@
                 </div>
 
             </ChildContent>
+
         </AuthorizeView>
 
     </div>
@@ -116,14 +118,16 @@
                             Omnicomm
                         </th>
 
-                        <AuthorizeView Roles="@Roles.Admin">
-                            <ChildContent Context="adminContext">
+                        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+                            <ChildContent>
 
                                 <th class="text-end">
                                     Действия
                                 </th>
 
                             </ChildContent>
+
                         </AuthorizeView>
 
                     </tr>
@@ -201,8 +205,9 @@
                                 </td>
 
 
-                                <AuthorizeView Roles="@Roles.Admin">
-                                    <ChildContent Context="adminContext">
+                                <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+
+                                    <ChildContent>
 
                                         <td class="text-end">
 
@@ -231,6 +236,7 @@
                                         </td>
 
                                     </ChildContent>
+
                                 </AuthorizeView>
 
                             </tr>

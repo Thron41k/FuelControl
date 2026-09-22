@@ -80,7 +80,9 @@ public sealed class UserAdministrationService(
         var normalizedEmail =
             NormalizeEmail(email);
 
-        ValidateRole(role);
+        ValidateRoleAndBranch(
+            role,
+            branchId);
 
         await EnsureBranchExistsAsync(
             branchId,
@@ -339,6 +341,20 @@ public sealed class UserAdministrationService(
         {
             throw new InvalidOperationException(
                 $"Недопустимая роль: {role}");
+        }
+    }
+
+    private static void ValidateRoleAndBranch(
+        string role,
+        Guid? branchId)
+    {
+        ValidateRole(role);
+
+        if (role != Roles.Admin &&
+            branchId is null)
+        {
+            throw new InvalidOperationException(
+                "Для диспетчера и модератора необходимо указать филиал.");
         }
     }
 

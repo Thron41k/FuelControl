@@ -1,6 +1,6 @@
 ﻿@page "/fuel-trucks"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = Roles.Admin)]
+@attribute [Authorize(Roles = Roles.DispatcherOrHigher)]
 
 @using FuelControl.Components.Pages.FuelingRecord.Dialogs
 @using FuelControl.Domain.Entities
@@ -27,15 +27,19 @@
             </div>
         </div>
 
-        <button type="button"
-                class="btn btn-primary"
-                @onclick="OpenCreateDialog">
+        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
 
-            <span class="bi bi-plus-lg me-1"></span>
+            <button type="button"
+                    class="btn btn-primary"
+                    @onclick="OpenCreateDialog">
 
-            Добавить
+                <span class="bi bi-plus-lg me-1"></span>
 
-        </button>
+                Добавить
+
+            </button>
+
+        </AuthorizeView>
 
     </div>
 
@@ -205,41 +209,32 @@
                                     <td>
                                         @(fuelTruck.Vehicle.Branch?.Name ?? "—")
                                     </td>
+                                    <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+                                        <ChildContent>
+                                            <td class="text-end">
 
-                                    <td class="text-end">
+                                                <div class="btn-group">
 
-                                        <div class="btn-group">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            @onclick="() => OpenOmnicommSettings(fuelTruck)">
 
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-primary"
-                                                    @onclick="() => OpenOmnicommSettings(fuelTruck)">
-
-                                                <span class="bi bi-gear"></span>
-                                                Настроить
-
-                                            </button>
-
-                                            <AuthorizeView Roles="@Roles.Admin">
-
-                                                <ChildContent Context="adminContext">
-
+                                                        <span class="bi bi-gear"></span>
+                                                        Настроить
+                                                    </button>
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-danger"
                                                             @onclick="() => ConfirmDelete(fuelTruck.Id)">
-
                                                         <span class="bi bi-trash"></span>
                                                         Удалить
 
                                                     </button>
 
-                                                </ChildContent>
+                                                </div>
 
-                                            </AuthorizeView>
-
-                                        </div>
-
-                                    </td>
-
+                                            </td>
+                                        </ChildContent>
+                                    </AuthorizeView>
                                 </tr>
                             }
 
@@ -352,8 +347,8 @@
                                     @foreach (var vehicle in FilteredAvailableVehicles)
                                     {
                                         <tr class="@(SelectedVehicleId == vehicle.Id
-                                                       ? "table-primary"
-                                                       : "")"
+                                                                                                   ? "table-primary"
+                                                                                                   : "")"
                                             style="cursor: pointer;"
                                             @onclick="() => SelectVehicle(vehicle)"
                                             @ondblclick="() => SelectVehicleAndSave(vehicle)">
@@ -537,13 +532,13 @@
                             <button type="button"
                                     class="btn btn-outline-primary"
                                     @onclick="() => OpenVehicleSelection(
-                                        OmnicommSelectionType.Tank)"
-                                    disabled="@IsSavingOmnicomm">
+                                                                            OmnicommSelectionType.Tank)"
+    disabled="@IsSavingOmnicomm">
 
                                 <span class="bi bi-search me-1"></span>
                                 Выбрать
 
-                            </button>
+</button>
 
                         </div>
 
@@ -580,13 +575,13 @@
                             <button type="button"
                                     class="btn btn-outline-primary"
                                     @onclick="() => OpenVehicleSelection(
-                                        OmnicommSelectionType.Uss)"
-                                    disabled="@IsSavingOmnicomm">
+                                                                            OmnicommSelectionType.Uss)"
+    disabled="@IsSavingOmnicomm">
 
                                 <span class="bi bi-search me-1"></span>
                                 Выбрать
 
-                            </button>
+</button>
 
                         </div>
 
@@ -645,12 +640,11 @@
    Существующий VehicleSelectDialog
    ================================================================ *@
 
-<VehicleSelectDialog
-    Visible="@ShowVehicleSelectionDialog"
-    Vehicles="@OmnicommVehicles"
-    SelectedVehicleId="@GetCurrentSelectionId()"
-    OnSelected="@OnVehicleSelected"
-    OnClosed="@CloseVehicleSelection" />
+<VehicleSelectDialog Visible="@ShowVehicleSelectionDialog"
+                     Vehicles="@OmnicommVehicles"
+                     SelectedVehicleId="@GetCurrentSelectionId()"
+                     OnSelected="@OnVehicleSelected"
+                     OnClosed="@CloseVehicleSelection" />
 
 
 @* ================================================================

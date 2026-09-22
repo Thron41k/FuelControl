@@ -61,6 +61,66 @@ public sealed class UserAuthorizationService(
             role);
     }
 
+    public async Task<bool> IsAdminAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user =
+            await GetCurrentUserAsync(
+                cancellationToken);
+
+        return await userManager.IsInRoleAsync(
+            user,
+            Roles.Admin);
+    }
+
+    public async Task<Guid> GetCurrentUserIdAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user =
+            await GetCurrentUserAsync(
+                cancellationToken);
+
+        return user.Id;
+    }
+
+    public async Task<Guid?> GetCurrentUserBranchIdAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user =
+            await GetCurrentUserAsync(
+                cancellationToken);
+
+        return user.BranchId;
+    }
+
+    public async Task EnsureBranchAccessAsync(
+        Guid branchId,
+        CancellationToken cancellationToken = default)
+    {
+        var user =
+            await GetCurrentUserAsync(
+                cancellationToken);
+
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            return;
+        }
+
+        if (user.BranchId is null)
+        {
+            throw new UnauthorizedAccessException(
+                "Для пользователя не назначен филиал.");
+        }
+
+        if (user.BranchId.Value != branchId)
+        {
+            throw new UnauthorizedAccessException(
+                "Объект относится к другому филиалу.");
+        }
+    }
+
     private async Task EnsureAnyRoleAsync(
         IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken)
