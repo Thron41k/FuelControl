@@ -17,4 +17,6 @@ public sealed class AdminUserModel
     public bool IsLockedOut { get; init; }
 
     public bool EmailConfirmed { get; init; }
+
+    public IReadOnlyList<Guid> AdditionalBranchIds { get; init; } = [];
 }

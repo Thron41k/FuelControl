@@ -20,7 +20,6 @@ public sealed class FuelTruckService(
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
 
-        var user = await GetRequiredUserAsync();
 
         var query = dbContext.Set<FuelTruck>()
             .AsNoTracking()
@@ -30,20 +29,13 @@ public sealed class FuelTruckService(
             .Include(x => x.TankVehicle)
             .AsQueryable();
 
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                return [];
-            }
-
-            query = query.Where(
-                x => x.Vehicle.BranchId == user.BranchId.Value);
-        }
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
 
         return await query
+            .Where(x =>
+                accessibleBranchIds.Contains(x.Vehicle.BranchId))
             .OrderBy(x => x.Vehicle.Name)
             .ToListAsync(cancellationToken);
     }
@@ -54,8 +46,6 @@ public sealed class FuelTruckService(
         await authorization.EnsureModeratorAsync(
             cancellationToken);
 
-        var user = await GetRequiredUserAsync();
-
         var query = dbContext.Vehicles
             .AsNoTracking()
             .Where(vehicle =>
@@ -65,20 +55,12 @@ public sealed class FuelTruckService(
             .Include(x => x.Branch)
             .AsQueryable();
 
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                return [];
-            }
-
-            query = query.Where(
-                x => x.BranchId == user.BranchId.Value);
-        }
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
 
         return await query
+            .Where(x => accessibleBranchIds.Contains(x.BranchId))
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }
@@ -101,8 +83,7 @@ public sealed class FuelTruckService(
                 "Техника не найдена или неактивна.");
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            vehicle.BranchId,
-            user);
+            vehicle.BranchId);
 
         var alreadyExists = await dbContext
             .Set<FuelTruck>()
@@ -147,8 +128,7 @@ public sealed class FuelTruckService(
                 "Топливозаправщик не найден.");
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            fuelTruck.Vehicle.BranchId,
-            user);
+            fuelTruck.Vehicle.BranchId);
 
         var vehicle = await dbContext.Vehicles
             .SingleOrDefaultAsync(
@@ -159,8 +139,7 @@ public sealed class FuelTruckService(
                 "Техника не найдена или неактивна.");
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            vehicle.BranchId,
-            user);
+            vehicle.BranchId);
 
         var alreadyAssigned = await dbContext
             .Set<FuelTruck>()
@@ -201,8 +180,7 @@ public sealed class FuelTruckService(
                 "Топливозаправщик не найден.");
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            fuelTruck.Vehicle.BranchId,
-            user);
+            fuelTruck.Vehicle.BranchId);
 
         await ValidateOmnicommVehicleAsync(
             ussVehicleId,
@@ -247,8 +225,7 @@ public sealed class FuelTruckService(
                 "Топливозаправщик не найден.");
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            fuelTruck.Vehicle.BranchId,
-            user);
+            fuelTruck.Vehicle.BranchId);
 
         var hasFuelingRecords = await dbContext
             .Set<FuelingRecord>()
@@ -297,8 +274,7 @@ public sealed class FuelTruckService(
         }
 
         await EnsureVehicleBelongsToUserScopeAsync(
-            vehicle.BranchId,
-            user);
+            vehicle.BranchId);
 
         if (vehicle.BranchId != fuelTruckBranchId)
         {
@@ -316,27 +292,9 @@ public sealed class FuelTruckService(
     }
 
     private async Task EnsureVehicleBelongsToUserScopeAsync(
-        Guid branchId,
-        ApplicationUser user)
+        Guid branchId)
     {
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            return;
-        }
-
-        if (user.BranchId is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
-        }
-
-        if (branchId != user.BranchId.Value)
-        {
-            throw new UnauthorizedAccessException(
-                "Техника относится к другому филиалу.");
-        }
+        await authorization.EnsureBranchAccessAsync(branchId);
     }
 
     private async Task<ApplicationUser> GetRequiredUserAsync()

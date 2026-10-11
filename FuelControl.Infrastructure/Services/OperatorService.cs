@@ -21,8 +21,6 @@ public sealed class OperatorService(
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
 
-        var user =
-            await GetRequiredUserAsync();
 
         var query =
             dbContext.Operators
@@ -36,27 +34,12 @@ public sealed class OperatorService(
                 query.Where(x => x.IsActive);
         }
 
-        // Admin видит всех водителей.
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            return await query
-                .OrderBy(x => x.Branch.Name)
-                .ThenBy(x => x.FullName)
-                .ToListAsync(cancellationToken);
-        }
-
-        // Dispatcher и Moderator видят только
-        // водителей своего филиала.
-        if (user.BranchId is null)
-        {
-            return [];
-        }
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
 
         return await query
-            .Where(x =>
-                x.BranchId == user.BranchId.Value)
+            .Where(x => accessibleBranchIds.Contains(x.BranchId))
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
     }
@@ -78,7 +61,8 @@ public sealed class OperatorService(
         var targetBranchId =
             await ResolveBranchForWriteAsync(
                 user,
-                branchId);
+                branchId,
+                cancellationToken);
 
         var normalizedFullName =
             NormalizeFullName(fullName);
@@ -139,46 +123,15 @@ public sealed class OperatorService(
             ?? throw new InvalidOperationException(
                 "Водитель не найден.");
 
-        Guid targetBranchId;
+        await authorization.EnsureBranchAccessAsync(
+            @operator.BranchId,
+            cancellationToken);
 
-        // Admin может редактировать водителя
-        // любого филиала и менять филиал.
-        if (await userManager.IsInRoleAsync(
+        var targetBranchId =
+            await ResolveBranchForWriteAsync(
                 user,
-                Roles.Admin))
-        {
-            if (branchId is null)
-            {
-                throw new ArgumentException(
-                    "Необходимо указать филиал.",
-                    nameof(branchId));
-            }
-
-            targetBranchId =
-                branchId.Value;
-        }
-        else
-        {
-            if (user.BranchId is null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Для пользователя не назначен филиал.");
-            }
-
-            // Moderator не может редактировать
-            // водителя другого филиала.
-            if (@operator.BranchId !=
-                user.BranchId.Value)
-            {
-                throw new UnauthorizedAccessException(
-                    "Водитель относится к другому филиалу.");
-            }
-
-            // branchId из браузера для Moderator
-            // полностью игнорируем.
-            targetBranchId =
-                user.BranchId.Value;
-        }
+                branchId ?? @operator.BranchId,
+                cancellationToken);
 
         var normalizedFullName =
             NormalizeFullName(fullName);
@@ -230,25 +183,9 @@ public sealed class OperatorService(
             ?? throw new InvalidOperationException(
                 "Водитель не найден.");
 
-        // Admin может менять состояние водителя
-        // любого филиала.
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Для пользователя не назначен филиал.");
-            }
-
-            if (@operator.BranchId !=
-                user.BranchId.Value)
-            {
-                throw new UnauthorizedAccessException(
-                    "Водитель относится к другому филиалу.");
-            }
-        }
+        await authorization.EnsureBranchAccessAsync(
+            @operator.BranchId,
+            cancellationToken);
 
         SetOperatorState(
             @operator,
@@ -277,25 +214,9 @@ public sealed class OperatorService(
             ?? throw new InvalidOperationException(
                 "Водитель не найден.");
 
-        // Moderator может удалить только водителя
-        // своего филиала.
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Для пользователя не назначен филиал.");
-            }
-
-            if (@operator.BranchId !=
-                user.BranchId.Value)
-            {
-                throw new UnauthorizedAccessException(
-                    "Водитель относится к другому филиалу.");
-            }
-        }
+        await authorization.EnsureBranchAccessAsync(
+            @operator.BranchId,
+            cancellationToken);
 
         if (@operator.IsActive)
         {
@@ -343,35 +264,42 @@ public sealed class OperatorService(
     }
 
 
-    private async Task<Guid>
-        ResolveBranchForWriteAsync(
-            ApplicationUser user,
-            Guid? requestedBranchId)
+    private async Task<Guid> ResolveBranchForWriteAsync(
+        ApplicationUser user,
+        Guid? requestedBranchId,
+        CancellationToken cancellationToken)
     {
-        // Admin может выбрать любой филиал.
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (requestedBranchId is null)
-            {
-                throw new ArgumentException(
-                    "Необходимо указать филиал.",
-                    nameof(requestedBranchId));
-            }
+        var targetBranchId = requestedBranchId;
 
-            return requestedBranchId.Value;
+        if (targetBranchId is null &&
+            !await userManager.IsInRoleAsync(user, Roles.Admin))
+        {
+            targetBranchId = user.BranchId;
         }
 
-        // Для Moderator берём филиал
-        // непосредственно из текущего пользователя.
-        if (user.BranchId is null)
+        if (targetBranchId is null)
         {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
+            throw new ArgumentException(
+                "Необходимо указать филиал.",
+                nameof(requestedBranchId));
         }
 
-        return user.BranchId.Value;
+        var branchExists = await dbContext.Branchs
+            .AnyAsync(
+                x => x.Id == targetBranchId.Value,
+                cancellationToken);
+
+        if (!branchExists)
+        {
+            throw new InvalidOperationException(
+                "Указанный филиал не найден.");
+        }
+
+        await authorization.EnsureBranchAccessAsync(
+            targetBranchId.Value,
+            cancellationToken);
+
+        return targetBranchId.Value;
     }
 
 

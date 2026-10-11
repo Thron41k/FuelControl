@@ -10,7 +10,7 @@ namespace FuelControl.Infrastructure.Services;
 public sealed class UserAdministrationService(
     FuelControlDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    RoleManager<IdentityRole<Guid>> roleManager,
+    IUserAuthorizationService authorization,
     ICurrentUserService currentUserService)
     : IUserAdministrationService
 {
@@ -21,6 +21,7 @@ public sealed class UserAdministrationService(
             await dbContext.Users
                 .AsNoTracking()
                 .Include(x => x.Branch)
+                .Include(x => x.AdditionalBranchAccesses)
                 .OrderBy(x => x.DisplayName)
                 .ThenBy(x => x.Email)
                 .ToListAsync(cancellationToken);
@@ -60,7 +61,10 @@ public sealed class UserAdministrationService(
                         user.LockoutEnd.Value > DateTimeOffset.UtcNow,
 
                     EmailConfirmed =
-                        user.EmailConfirmed
+                        user.EmailConfirmed,
+                    AdditionalBranchIds = user.AdditionalBranchAccesses
+                        .Select(x => x.BranchId)
+                        .ToArray(),
                 });
         }
 
@@ -298,6 +302,17 @@ public sealed class UserAdministrationService(
             locked
                 ? "Не удалось заблокировать пользователя."
                 : "Не удалось разблокировать пользователя.");
+    }
+
+    public Task<IReadOnlyList<AdminUserModel>> GetForBranchAccessAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task SetAdditionalBranchesAsync(Guid userId, IReadOnlyCollection<Guid> branchIds,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
     }
 
     private async Task EnsureAdminAsync()

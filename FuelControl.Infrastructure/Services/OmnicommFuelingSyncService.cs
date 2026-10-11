@@ -23,7 +23,9 @@ public sealed class OmnicommFuelingSyncService(
 
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
-
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
         var matchedBy =
             await authorization.GetCurrentUserIdAsync(
                 cancellationToken);
@@ -51,7 +53,8 @@ public sealed class OmnicommFuelingSyncService(
             dbContext.Vehicles
                 .AsNoTracking()
                 .Where(x =>
-                    x.OmnicommObjectId.HasValue);
+                    x.OmnicommObjectId.HasValue &&
+                    accessibleBranchIds.Contains(x.BranchId));
 
         if (vehicleId.HasValue)
         {
@@ -140,12 +143,17 @@ public sealed class OmnicommFuelingSyncService(
         var fuelingRecords =
             await dbContext.FuelingRecords
                 .Include(x => x.Vehicle)
+                .Include(x => x.FuelTruck)
+                .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Operator)
                 .Where(x =>
-                    selectedVehicleIds.Contains(
-                        x.VehicleId))
-                .Where(x =>
+                    selectedVehicleIds.Contains(x.VehicleId) &&
                     x.FuelingDateTime >= fromUtc &&
-                    x.FuelingDateTime < toUtc)
+                    x.FuelingDateTime < toUtc &&
+                    accessibleBranchIds.Contains(x.Vehicle.BranchId) &&
+                    accessibleBranchIds.Contains(
+                        x.FuelTruck.Vehicle.BranchId) &&
+                    accessibleBranchIds.Contains(x.Operator.BranchId))
                 .OrderBy(x => x.FuelingDateTime)
                 .ToListAsync(cancellationToken);
 

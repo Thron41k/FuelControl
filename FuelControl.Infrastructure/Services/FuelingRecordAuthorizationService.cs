@@ -1,98 +1,124 @@
-﻿using FuelControl.Infrastructure.Identity;
-using FuelControl.Infrastructure.Persistence;
+﻿using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class FuelingRecordAuthorizationService(
     FuelControlDbContext dbContext,
-    UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    IUserAuthorizationService authorization)
     : IFuelingRecordAuthorizationService
 {
     public async Task<bool> CanCreateAsync(
         Guid fuelTruckId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetCurrentUserAsync();
+        try
+        {
+            await authorization.EnsureDispatcherAsync(
+                cancellationToken);
 
-        if (user is null)
-            return false;
+            var branchId =
+                await dbContext.FuelTrucks
+                    .AsNoTracking()
+                    .Where(x => x.Id == fuelTruckId)
+                    .Select(x => (Guid?)x.Vehicle.BranchId)
+                    .SingleOrDefaultAsync(cancellationToken);
 
-        // Администратор имеет полный доступ.
-        if (await userManager.IsInRoleAsync(user, "Admin"))
+            if (branchId is null)
+            {
+                return false;
+            }
+
+            await authorization.EnsureBranchAccessAsync(
+                branchId.Value,
+                cancellationToken);
+
             return true;
-
-        // Только диспетчер может работать с ведомостями.
-        if (!await userManager.IsInRoleAsync(user, "Dispatcher"))
+        }
+        catch (UnauthorizedAccessException)
+        {
             return false;
-
-        // У диспетчера должен быть назначен филиал.
-        if (user.BranchId is null)
-            return false;
-
-        // Получаем филиал АТЗ.
-        var fuelTruckBranchId = await dbContext.FuelTrucks
-            .Where(x => x.Id == fuelTruckId)
-            .Select(x => (Guid?)x.Vehicle.BranchId)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (fuelTruckBranchId is null)
-            return false;
-
-        // Главная проверка.
-        return fuelTruckBranchId == user.BranchId;
+        }
     }
 
-    public async Task<bool> CanEditAsync(
+    public Task<bool> CanEditAsync(
         Guid fuelingRecordId,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetCurrentUserAsync();
-
-        if (user is null)
-            return false;
-
-        // Администратор имеет полный доступ.
-        if (await userManager.IsInRoleAsync(user, "Admin"))
-            return true;
-
-        // Только диспетчер может редактировать ведомости.
-        if (!await userManager.IsInRoleAsync(user, "Dispatcher"))
-            return false;
-
-        if (user.BranchId is null)
-            return false;
-
-        // Получаем филиал АТЗ через FuelingRecord.
-        var fuelTruckBranchId = await dbContext.FuelingRecords
-            .Where(x => x.Id == fuelingRecordId)
-            .Select(x => (Guid?)x.FuelTruck.Vehicle.BranchId)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (fuelTruckBranchId is null)
-            return false;
-
-        return fuelTruckBranchId == user.BranchId;
-    }
-
-    public async Task<bool> CanDeleteAsync(
-        Guid fuelingRecordId,
-        CancellationToken cancellationToken = default)
-    {
-        return await CanEditAsync(
+        return CanAccessRecordAsync(
             fuelingRecordId,
+            requireModerator: false,
             cancellationToken);
     }
 
-    private async Task<ApplicationUser?> GetCurrentUserAsync()
+    public Task<bool> CanDeleteAsync(
+        Guid fuelingRecordId,
+        CancellationToken cancellationToken = default)
     {
-        if (currentUserService.UserId is not { } userId)
-            return null;
+        return CanAccessRecordAsync(
+            fuelingRecordId,
+            requireModerator: true,
+            cancellationToken);
+    }
 
-        return await userManager.FindByIdAsync(
-            userId.ToString());
+    private async Task<bool> CanAccessRecordAsync(
+        Guid fuelingRecordId,
+        bool requireModerator,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (requireModerator)
+            {
+                await authorization.EnsureModeratorAsync(
+                    cancellationToken);
+            }
+            else
+            {
+                await authorization.EnsureDispatcherAsync(
+                    cancellationToken);
+            }
+
+            var record =
+                await dbContext.FuelingRecords
+                    .AsNoTracking()
+                    .Where(x => x.Id == fuelingRecordId)
+                    .Select(x => new
+                    {
+                        FuelTruckBranchId =
+                            x.FuelTruck.Vehicle.BranchId,
+
+                        VehicleBranchId =
+                            x.Vehicle.BranchId,
+
+                        OperatorBranchId =
+                            x.Operator.BranchId
+                    })
+                    .SingleOrDefaultAsync(cancellationToken);
+
+            if (record is null)
+            {
+                return false;
+            }
+
+            await authorization.EnsureBranchAccessAsync(
+                record.FuelTruckBranchId,
+                cancellationToken);
+
+            await authorization.EnsureBranchAccessAsync(
+                record.VehicleBranchId,
+                cancellationToken);
+
+            await authorization.EnsureBranchAccessAsync(
+                record.OperatorBranchId,
+                cancellationToken);
+
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

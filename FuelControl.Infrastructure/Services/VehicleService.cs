@@ -72,34 +72,17 @@ public sealed class VehicleService(
         await authorization.EnsureDispatcherAsync(
             cancellationToken);
 
-        var user =
-            await GetRequiredUserAsync();
-
-        var query =
-            dbContext.Vehicles
-                .AsNoTracking()
-                .Include(x => x.Branch)
-                .Where(x => x.Id == id);
-
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            return await query
-                .SingleOrDefaultAsync(
-                    cancellationToken);
-        }
-
-        if (user.BranchId is null)
-        {
-            return null;
-        }
-
-        return await query
-            .Where(x =>
-                x.BranchId == user.BranchId.Value)
-            .SingleOrDefaultAsync(
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
                 cancellationToken);
+
+        return await dbContext.Vehicles
+            .AsNoTracking()
+            .Include(x => x.Branch)
+            .Where(x =>
+                x.Id == id &&
+                accessibleBranchIds.Contains(x.BranchId))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
 
@@ -121,7 +104,7 @@ public sealed class VehicleService(
         var targetBranchId =
             await ResolveBranchForWriteAsync(
                 user,
-                branchId);
+                branchId, cancellationToken);
 
         var normalizedRfidTagId =
             NormalizeRfidTagId(rfidTagId);
@@ -179,65 +162,16 @@ public sealed class VehicleService(
             ?? throw new InvalidOperationException(
                 "Техника не найдена.");
 
-        // Administrator может изменять технику
-        // любого филиала.
-        if (await userManager.IsInRoleAsync(
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
+
+        var targetBranchId =
+            await ResolveBranchForWriteAsync(
                 user,
-                Roles.Admin))
-        {
-            if (branchId is null)
-            {
-                throw new ArgumentException(
-                    "Необходимо указать филиал.",
-                    nameof(branchId));
-            }
+                branchId ?? vehicle.BranchId, cancellationToken);
 
-            await EnsureOmnicommObjectIsAvailableAsync(
-                omnicommObjectId,
-                id,
-                cancellationToken);
-
-            var normalizedRfidTagId =
-                NormalizeRfidTagId(rfidTagId);
-
-            await EnsureRfidTagIsAvailableAsync(
-                normalizedRfidTagId,
-                id,
-                cancellationToken);
-
-            vehicle.Update(
-                name.Trim(),
-                registrationNumber.Trim(),
-                branchId.Value,
-                omnicommObjectId,
-                NormalizeInventoryNumber(
-                    inventoryNumber),
-                normalizedRfidTagId);
-
-            await dbContext.SaveChangesAsync(
-                cancellationToken);
-
-            return;
-        }
-
-        // Здесь уже гарантирован Moderator
-        // или выше, поскольку был EnsureModeratorAsync().
-        if (user.BranchId is null)
-        {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
-        }
-
-        // Moderator не может редактировать технику
-        // другого филиала.
-        if (vehicle.BranchId !=
-            user.BranchId.Value)
-        {
-            throw new UnauthorizedAccessException(
-                "Техника относится к другому филиалу.");
-        }
-
-        var normalizedModeratorRfidTagId =
+        var normalizedRfidTagId =
             NormalizeRfidTagId(rfidTagId);
 
         await EnsureOmnicommObjectIsAvailableAsync(
@@ -246,22 +180,19 @@ public sealed class VehicleService(
             cancellationToken);
 
         await EnsureRfidTagIsAvailableAsync(
-            normalizedModeratorRfidTagId,
+            normalizedRfidTagId,
             id,
             cancellationToken);
 
-        // Moderator не может изменить филиал.
         vehicle.Update(
             name.Trim(),
             registrationNumber.Trim(),
-            user.BranchId.Value,
+            targetBranchId,
             omnicommObjectId,
-            NormalizeInventoryNumber(
-                inventoryNumber),
-            normalizedModeratorRfidTagId);
+            NormalizeInventoryNumber(inventoryNumber),
+            normalizedRfidTagId);
 
-        await dbContext.SaveChangesAsync(
-            cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
 
@@ -284,23 +215,9 @@ public sealed class VehicleService(
             ?? throw new InvalidOperationException(
                 "Техника не найдена.");
 
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Для пользователя не назначен филиал.");
-            }
-
-            if (vehicle.BranchId !=
-                user.BranchId.Value)
-            {
-                throw new UnauthorizedAccessException(
-                    "Техника относится к другому филиалу.");
-            }
-        }
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
 
         SetVehicleState(
             vehicle,
@@ -330,23 +247,9 @@ public sealed class VehicleService(
                 "Техника не найдена.");
 
         // Moderator работает только со своим филиалом.
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Для пользователя не назначен филиал.");
-            }
-
-            if (vehicle.BranchId !=
-                user.BranchId.Value)
-            {
-                throw new UnauthorizedAccessException(
-                    "Техника относится к другому филиалу.");
-            }
-        }
+        await authorization.EnsureBranchAccessAsync(
+            vehicle.BranchId,
+            cancellationToken);
 
         if (vehicle.IsActive)
         {
@@ -408,20 +311,12 @@ public sealed class VehicleService(
                 .Where(x =>
                     x.OmnicommObjectId != null);
 
-        if (!await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (user.BranchId is null)
-            {
-                return [];
-            }
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
 
-            query =
-                query.Where(
-                    x => x.BranchId ==
-                         user.BranchId.Value);
-        }
+        query = query.Where(
+            x => accessibleBranchIds.Contains(x.BranchId));
 
         return await query
             .Select(
@@ -448,34 +343,42 @@ public sealed class VehicleService(
     }
 
 
-    private async Task<Guid>
-        ResolveBranchForWriteAsync(
-            ApplicationUser user,
-            Guid? requestedBranchId)
+    private async Task<Guid> ResolveBranchForWriteAsync(
+        ApplicationUser user,
+        Guid? requestedBranchId,
+        CancellationToken cancellationToken)
     {
-        // Admin может назначить любой филиал.
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            if (requestedBranchId is null)
-            {
-                throw new ArgumentException(
-                    "Необходимо указать филиал.",
-                    nameof(requestedBranchId));
-            }
+        var targetBranchId = requestedBranchId;
 
-            return requestedBranchId.Value;
+        if (targetBranchId is null &&
+            !await userManager.IsInRoleAsync(user, Roles.Admin))
+        {
+            targetBranchId = user.BranchId;
         }
 
-        // Moderator работает только со своим филиалом.
-        if (user.BranchId is null)
+        if (targetBranchId is null)
         {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
+            throw new ArgumentException(
+                "Необходимо указать филиал.",
+                nameof(requestedBranchId));
         }
 
-        return user.BranchId.Value;
+        var branchExists = await dbContext.Branchs
+            .AnyAsync(
+                x => x.Id == targetBranchId.Value,
+                cancellationToken);
+
+        if (!branchExists)
+        {
+            throw new InvalidOperationException(
+                "Указанный филиал не найден.");
+        }
+
+        await authorization.EnsureBranchAccessAsync(
+            targetBranchId.Value,
+            cancellationToken);
+
+        return targetBranchId.Value;
     }
 
 

@@ -1,12 +1,14 @@
-﻿using FuelControl.Infrastructure.Services.Interfaces;
+﻿using FuelControl.Infrastructure.Persistence;
+using FuelControl.Infrastructure.Services.Interfaces;
 using FuelControl.Infrastructure.Services.Models;
 using FuelControl.Omnicomm.Reports;
 using FuelControl.Omnicomm.Reports.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class OmnicommFuelingService(
-    IOmnicommReportClient reportClient)
+    IOmnicommReportClient reportClient, FuelControlDbContext dbContext, IUserAuthorizationService authorization)
     : IOmnicommFuelingService
 {
     public async Task<OmnicommFuelingData> GetFuelingsAsync(
@@ -18,6 +20,31 @@ public sealed class OmnicommFuelingService(
     {
         ArgumentNullException.ThrowIfNull(vehicleIds);
         ArgumentNullException.ThrowIfNull(userTimeZone);
+
+        var requestedIds = vehicleIds
+            .Distinct()
+            .ToList();
+
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
+
+        var allowedIds =
+            await dbContext.Vehicles
+                .AsNoTracking()
+                .Where(x =>
+                    x.OmnicommObjectId.HasValue &&
+                    requestedIds.Contains(x.OmnicommObjectId.Value) &&
+                    accessibleBranchIds.Contains(x.BranchId))
+                .Select(x => x.OmnicommObjectId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+        if (allowedIds.Count != requestedIds.Count)
+        {
+            throw new UnauthorizedAccessException(
+                "Запрошены объекты Omnicomm, к которым нет доступа.");
+        }
 
         if (vehicleIds.Count == 0)
         {

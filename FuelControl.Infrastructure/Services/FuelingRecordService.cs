@@ -55,19 +55,14 @@ public sealed class FuelingRecordService(
                     x.FuelingDateTime >= utcStart &&
                     x.FuelingDateTime < utcEnd);
 
-        var branchId =
-            await authorization.GetCurrentUserBranchIdAsync(
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
                 cancellationToken);
 
-        if (branchId is not null &&
-            !await authorization.IsAdminAsync(
-                cancellationToken))
-        {
-            query = query.Where(x =>
-                x.FuelTruck.Vehicle.BranchId == branchId.Value &&
-                x.Vehicle.BranchId == branchId.Value &&
-                x.Operator.BranchId == branchId.Value);
-        }
+        query = query.Where(x =>
+            accessibleBranchIds.Contains(x.FuelTruck.Vehicle.BranchId) &&
+            accessibleBranchIds.Contains(x.Vehicle.BranchId) &&
+            accessibleBranchIds.Contains(x.Operator.BranchId));
 
         if (fuelTruckId.HasValue)
         {
@@ -132,19 +127,14 @@ public sealed class FuelingRecordService(
                     x.FuelingDateTime >= utcStart &&
                     x.FuelingDateTime < utcEnd);
 
-        var branchId =
-            await authorization.GetCurrentUserBranchIdAsync(
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
                 cancellationToken);
 
-        if (branchId is not null &&
-            !await authorization.IsAdminAsync(
-                cancellationToken))
-        {
-            query = query.Where(x =>
-                x.FuelTruck.Vehicle.BranchId == branchId.Value &&
-                x.Vehicle.BranchId == branchId.Value &&
-                x.Operator.BranchId == branchId.Value);
-        }
+        query = query.Where(x =>
+            accessibleBranchIds.Contains(x.FuelTruck.Vehicle.BranchId) &&
+            accessibleBranchIds.Contains(x.Vehicle.BranchId) &&
+            accessibleBranchIds.Contains(x.Operator.BranchId));
 
         if (vehicleId.HasValue)
         {
@@ -290,7 +280,9 @@ public sealed class FuelingRecordService(
         var fuelingRecord =
             await dbContext.FuelingRecords
                 .Include(x => x.FuelTruck)
-                    .ThenInclude(x => x.Vehicle)
+                .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Vehicle)
+                .Include(x => x.Operator)
                 .SingleOrDefaultAsync(
                     x => x.Id == id,
                     cancellationToken)
@@ -366,7 +358,9 @@ public sealed class FuelingRecordService(
         var fuelingRecord =
             await dbContext.FuelingRecords
                 .Include(x => x.FuelTruck)
-                    .ThenInclude(x => x.Vehicle)
+                .ThenInclude(x => x.Vehicle)
+                .Include(x => x.Vehicle)
+                .Include(x => x.Operator)
                 .SingleOrDefaultAsync(
                     x => x.Id == id,
                     cancellationToken)
@@ -388,14 +382,16 @@ public sealed class FuelingRecordService(
         FuelingRecord record,
         CancellationToken cancellationToken)
     {
-        if (await authorization.IsAdminAsync(
-                cancellationToken))
-        {
-            return;
-        }
-
         await authorization.EnsureBranchAccessAsync(
             record.FuelTruck.Vehicle.BranchId,
+            cancellationToken);
+
+        await authorization.EnsureBranchAccessAsync(
+            record.Vehicle.BranchId,
+            cancellationToken);
+
+        await authorization.EnsureBranchAccessAsync(
+            record.Operator.BranchId,
             cancellationToken);
     }
 }

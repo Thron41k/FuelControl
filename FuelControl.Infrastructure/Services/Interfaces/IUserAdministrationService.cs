@@ -32,4 +32,13 @@ public interface IUserAdministrationService
         Guid userId,
         bool locked,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AdminUserModel>>
+        GetForBranchAccessAsync(
+            CancellationToken cancellationToken = default);
+
+    Task SetAdditionalBranchesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> branchIds,
+        CancellationToken cancellationToken = default);
 }

@@ -215,6 +215,18 @@ public sealed class BranchService(
             throw new InvalidOperationException(
                 "Нельзя удалить филиал, к которому привязаны пользователи.");
         }
+        var hasAdditionalAccesses =
+            await dbContext.UserBranchAccesses
+                .AnyAsync(
+                    x => x.BranchId == id,
+                    cancellationToken);
+
+        if (hasAdditionalAccesses)
+        {
+            throw new InvalidOperationException(
+                "Нельзя удалить филиал, пока он назначен " +
+                "дополнительным филиалом доступа пользователей.");
+        }
 
         dbContext.Set<Branch>().Remove(branch);
 
@@ -222,48 +234,19 @@ public sealed class BranchService(
             cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Branch>> GetAvailableForCurrentUserAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Branch>>
+        GetAvailableForCurrentUserAsync(
+            CancellationToken cancellationToken = default)
     {
-        await authorization.EnsureDispatcherAsync(
-            cancellationToken);
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
 
-        var user = await GetRequiredUserAsync();
-
-        if (await userManager.IsInRoleAsync(
-                user,
-                Roles.Admin))
-        {
-            return await dbContext.Set<Branch>()
-                .AsNoTracking()
-                .OrderBy(x => x.Name)
-                .ToListAsync(cancellationToken);
-        }
-
-        if (user.BranchId is null)
-        {
-            return [];
-        }
-
-        return await dbContext.Set<Branch>()
+        return await dbContext.Branchs
             .AsNoTracking()
-            .Where(x => x.Id == user.BranchId.Value)
+            .Where(x => accessibleBranchIds.Contains(x.Id))
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
-    }
-
-    private async Task<ApplicationUser> GetRequiredUserAsync()
-    {
-        if (currentUserService.UserId is not { } userId)
-        {
-            throw new UnauthorizedAccessException(
-                "Пользователь не авторизован.");
-        }
-
-        return await userManager.FindByIdAsync(
-                   userId.ToString())
-               ?? throw new UnauthorizedAccessException(
-                   "Пользователь не найден.");
     }
 
     private static string NormalizeName(string name)
