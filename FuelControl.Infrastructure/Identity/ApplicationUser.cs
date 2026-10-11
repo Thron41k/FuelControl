@@ -12,4 +12,10 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public Guid? BranchId { get; set; }
 
     public Branch? Branch { get; set; }
+
+    public ICollection<UserBranchAccess> AdditionalBranchAccesses
+    {
+        get;
+        set;
+    } = new List<UserBranchAccess>();
 }

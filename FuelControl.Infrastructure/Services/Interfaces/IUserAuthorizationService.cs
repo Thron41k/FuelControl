@@ -30,4 +30,8 @@ public interface IUserAuthorizationService
     Task EnsureBranchAccessAsync(
         Guid branchId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<Guid>> GetAccessibleBranchIdsAsync(
+        CancellationToken cancellationToken = default);
+
 }

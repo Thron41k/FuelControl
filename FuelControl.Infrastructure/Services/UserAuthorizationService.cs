@@ -1,12 +1,15 @@
 ﻿using FuelControl.Infrastructure.Identity;
+using FuelControl.Infrastructure.Persistence;
 using FuelControl.Infrastructure.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelControl.Infrastructure.Services;
 
 public sealed class UserAuthorizationService(
     UserManager<ApplicationUser> userManager,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    FuelControlDbContext dbContext)
     : IUserAuthorizationService
 {
     public async Task EnsureAuthenticatedAsync(
@@ -97,9 +100,11 @@ public sealed class UserAuthorizationService(
         Guid branchId,
         CancellationToken cancellationToken = default)
     {
-        var user =
-            await GetCurrentUserAsync(
-                cancellationToken);
+        await EnsureDispatcherAsync(
+            cancellationToken);
+
+        var user = await GetCurrentUserAsync(
+            cancellationToken);
 
         if (await userManager.IsInRoleAsync(
                 user,
@@ -108,16 +113,24 @@ public sealed class UserAuthorizationService(
             return;
         }
 
-        if (user.BranchId is null)
+        // Основной филиал.
+        if (user.BranchId == branchId)
         {
-            throw new UnauthorizedAccessException(
-                "Для пользователя не назначен филиал.");
+            return;
         }
 
-        if (user.BranchId.Value != branchId)
+        // Дополнительный филиал.
+        var hasAccess = await dbContext.UserBranchAccesses
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == user.Id &&
+                     x.BranchId == branchId,
+                cancellationToken);
+
+        if (!hasAccess)
         {
             throw new UnauthorizedAccessException(
-                "Объект относится к другому филиалу.");
+                "У пользователя нет доступа к этому филиалу.");
         }
     }
 
@@ -157,5 +170,43 @@ public sealed class UserAuthorizationService(
                    userId.ToString())
                ?? throw new UnauthorizedAccessException(
                    "Текущий пользователь не найден.");
+    }
+
+    public async Task<IReadOnlyCollection<Guid>>
+        GetAccessibleBranchIdsAsync(
+            CancellationToken cancellationToken = default)
+    {
+        await EnsureDispatcherAsync(
+            cancellationToken);
+
+        var user = await GetCurrentUserAsync(
+            cancellationToken);
+
+        // Администратор работает со всеми филиалами.
+        if (await userManager.IsInRoleAsync(
+                user,
+                Roles.Admin))
+        {
+            return await dbContext.Branchs
+                .AsNoTracking()
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        var branchIds = await dbContext.UserBranchAccesses
+            .AsNoTracking()
+            .Where(x => x.UserId == user.Id)
+            .Select(x => x.BranchId)
+            .ToListAsync(cancellationToken);
+
+        // Основной филиал всегда входит в список доступа.
+        if (user.BranchId is { } primaryBranchId)
+        {
+            branchIds.Add(primaryBranchId);
+        }
+
+        return branchIds
+            .Distinct()
+            .ToArray();
     }
 }

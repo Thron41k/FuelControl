@@ -494,6 +494,21 @@ namespace FuelControl.Infrastructure.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("FuelControl.Infrastructure.Identity.UserBranchAccess", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserId", "BranchId");
+
+                    b.HasIndex("BranchId");
+
+                    b.ToTable("UserBranchAccesses", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -752,6 +767,25 @@ namespace FuelControl.Infrastructure.Migrations
                     b.Navigation("Branch");
                 });
 
+            modelBuilder.Entity("FuelControl.Infrastructure.Identity.UserBranchAccess", b =>
+                {
+                    b.HasOne("FuelControl.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelControl.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany("AdditionalBranchAccesses")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
@@ -808,6 +842,11 @@ namespace FuelControl.Infrastructure.Migrations
                     b.Navigation("OmnicommRecord");
 
                     b.Navigation("UssRecords");
+                });
+
+            modelBuilder.Entity("FuelControl.Infrastructure.Identity.ApplicationUser", b =>
+                {
+                    b.Navigation("AdditionalBranchAccesses");
                 });
 #pragma warning restore 612, 618
         }

@@ -19,6 +19,8 @@ public sealed class FuelControlDbContext(DbContextOptions<FuelControlDbContext> 
     public DbSet<FuelingUssRecord> FuelingUssRecords => Set<FuelingUssRecord>();
     public DbSet<FuelingOmnicommRecord> FuelingOmnicommRecords
         => Set<FuelingOmnicommRecord>();
+    public DbSet<UserBranchAccess> UserBranchAccesses
+        => Set<UserBranchAccess>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

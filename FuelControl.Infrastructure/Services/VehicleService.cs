@@ -54,9 +54,12 @@ public sealed class VehicleService(
             return [];
         }
 
+        var accessibleBranchIds =
+            await authorization.GetAccessibleBranchIdsAsync(
+                cancellationToken);
+
         return await query
-            .Where(x =>
-                x.BranchId == user.BranchId.Value)
+            .Where(x => accessibleBranchIds.Contains(x.BranchId))
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }

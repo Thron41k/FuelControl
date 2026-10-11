@@ -533,65 +533,38 @@
 
                         
                         
-                        <AuthorizeView Roles="@Roles.ModeratorOrHigher">
-                            <ChildContent>
+                        <AuthorizeView Roles="@Roles.ModeratorOrHigher" Context="moderatorContext">
+                            <div class="mb-3">
+                                <label class="form-label">Omnicomm ID</label>
+                                <InputNumber class="form-control"
+                                             @bind-Value="_editModel.OmnicommObjectId" />
+                            </div>
 
+                            <div class="mb-3">
+                                <label class="form-label">RFID метка</label>
+                                <InputText class="form-control"
+                                           @bind-Value="_editModel.RfidTagId"
+                                           maxlength="64"
+                                           placeholder="Идентификатор RFID метки" />
+                            </div>
+
+                            <AuthorizeView Roles="@Roles.Admin" Context="adminContext">
                                 <div class="mb-3">
+                                    <label class="form-label">Филиал</label>
 
-                                    <label class="form-label">
-                                        Omnicomm ID
-                                    </label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="_editModel.BranchId">
+                                        <option value="">Выберите филиал</option>
 
-                                    <InputNumber class="form-control"
-                                                 @bind-Value="_editModel.OmnicommObjectId" />
+                                        @foreach (var branch in _branches)
+                                        {
+                                            <option value="@branch.Id">@branch.Name</option>
+                                        }
+                                    </InputSelect>
 
-
+                                    <ValidationMessage For="@(() => _editModel.BranchId)" />
                                 </div>
-
-                                <div class="mb-3">
-
-                                    <label class="form-label">
-                                        RFID метка
-                                    </label>
-
-                                    <InputText class="form-control"
-                                               @bind-Value="_editModel.RfidTagId"
-                                               maxlength="64"
-                                               placeholder="Идентификатор RFID метки" />
-
-                                </div>
-                                <AuthorizeView Roles="@Roles.Admin">
-
-                                    <ChildContent>
-                                        <div class="mb-3">
-
-                                            <label class="form-label">
-                                                Филиал
-                                            </label>
-
-                                            <InputSelect class="form-select"
-                                                         @bind-Value="_editModel.BranchId">
-
-                                                <option value="">
-                                                    Выберите филиал
-                                                </option>
-
-                                                @foreach (var branch in _branches)
-                                                {
-                                                    <option value="@branch.Id">
-                                                        @branch.Name
-                                                    </option>
-                                                }
-
-                                            </InputSelect>
-
-                                            <ValidationMessage For="() => _editModel.BranchId" />
-
-                                        </div>
-                                    </ChildContent>
-
-                                </AuthorizeView>
-                            </ChildContent>
+                            </AuthorizeView>
                         </AuthorizeView>
 
                     </div>
@@ -599,7 +572,7 @@
                     <div class="modal-footer">
                         @if (_editingVehicle is null)
                         {
-                            <AuthorizeView Roles="@Roles.ModeratorOrHigher">
+                            <AuthorizeView Roles="@Roles.ModeratorOrHigher" Context="moderatorContext">
                                 <button type="button"
                                         class="btn btn-outline-primary me-auto"
                                         @onclick="ImportFromOmnicomm"
