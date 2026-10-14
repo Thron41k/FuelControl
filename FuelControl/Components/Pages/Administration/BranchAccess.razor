@@ -1,0 +1,299 @@
+@page "/administration/branch-access"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = Roles.ModeratorOrHigher)]
+
+@using FuelControl.Domain.Entities
+@using FuelControl.Infrastructure.Identity
+@using FuelControl.Infrastructure.Services.Interfaces
+@using FuelControl.Infrastructure.Services.Models
+@using Microsoft.AspNetCore.Authorization
+
+@inject IUserAdministrationService UserAdministrationService
+@inject IBranchService BranchService
+
+<PageTitle>Доступ к филиалам</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="mb-3">
+        <h3 class="mb-1">Доступ к филиалам</h3>
+        <div class="text-muted">
+            Настройка дополнительных филиалов для пользователей.
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_errorMessage
+            <button type="button" class="btn-close" @onclick="ClearError"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_successMessage
+            <button type="button" class="btn-close" @onclick="ClearSuccess"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+    }
+    else if (_users.Count == 0)
+    {
+        <div class="alert alert-info">
+            Нет пользователей, для которых доступно управление дополнительными филиалами.
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header fw-semibold">Пользователь</div>
+                    <div class="card-body">
+                        <label for="branchAccessUser" class="form-label">Выберите пользователя</label>
+                        <select id="branchAccessUser"
+                                class="form-select"
+                                value="@(_selectedUserId?.ToString() ?? string.Empty)"
+                                @onchange="OnUserChanged">
+                            @foreach (var user in _users)
+                            {
+                                <option value="@user.Id">
+                                    @user.DisplayName (@user.Email) — @user.BranchName
+                                </option>
+                            }
+                        </select>
+
+                        @if (SelectedUser is { } selectedUser)
+                        {
+                            <hr />
+                            <div class="mb-2">
+                                <div class="small text-muted">Имя</div>
+                                <div class="fw-semibold">@selectedUser.DisplayName</div>
+                            </div>
+                            <div class="mb-2">
+                                <div class="small text-muted">Email</div>
+                                <div>@selectedUser.Email</div>
+                            </div>
+                            <div class="mb-2">
+                                <div class="small text-muted">Роль</div>
+                                <div>@RoleLabel(selectedUser.Role)</div>
+                            </div>
+                            <div>
+                                <div class="small text-muted">Основной филиал</div>
+                                <div>@(selectedUser.BranchName ?? "Не назначен")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Доступные филиалы</span>
+                        <span class="badge text-bg-secondary">@_selectedBranchIds.Count дополнительных</span>
+                    </div>
+                    <div class="card-body">
+                        @if (SelectedUser is { } branchSelectedUser)
+                        {
+                            <p class="text-muted small">
+                                Основной филиал доступен автоматически. Отметьте дополнительные филиалы, в которых пользователь может работать.
+                            </p>
+
+                            @if (_branches.Count == 0)
+                            {
+                                <div class="text-muted">Нет доступных филиалов.</div>
+                            }
+                            else
+                            {
+                                <div class="list-group">
+                                    @foreach (var branch in _branches)
+                                    {
+                                        var isPrimary = branchSelectedUser.BranchId == branch.Id;
+                                        var isChecked = isPrimary || _selectedBranchIds.Contains(branch.Id);
+
+                                        <label class="list-group-item d-flex align-items-center gap-2">
+                                            <input class="form-check-input mt-0"
+                                                   type="checkbox"
+                                                   checked="@isChecked"
+                                                   disabled="@(_saving || isPrimary)"
+                                                   @onchange="args => ToggleBranch(branch.Id, args)" />
+                                            <span class="flex-grow-1">@branch.Name</span>
+                                            @if (isPrimary)
+                                            {
+                                                <span class="badge text-bg-light">Основной</span>
+                                            }
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        }
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    @onclick="SaveAccess"
+                                    disabled="@(_saving || SelectedUser is null)">
+                                @if (_saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Сохранить доступ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<AdminUserModel> _users = [];
+    private IReadOnlyList<Branch> _branches = [];
+    private Guid? _selectedUserId;
+    private HashSet<Guid> _selectedBranchIds = [];
+    private bool _loading;
+    private bool _saving;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private AdminUserModel? SelectedUser =>
+        _selectedUserId is { } userId
+            ? _users.FirstOrDefault(x => x.Id == userId)
+            : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _users = await UserAdministrationService
+                .GetForBranchAccessAsync();
+
+            _branches = await BranchService
+                .GetAvailableForCurrentUserAsync();
+
+            if (_selectedUserId is null ||
+                !_users.Any(x => x.Id == _selectedUserId.Value))
+            {
+                _selectedUserId = _users.FirstOrDefault()?.Id;
+            }
+
+            RefreshSelectedBranches();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnUserChanged(ChangeEventArgs args)
+    {
+        _errorMessage = null;
+        _successMessage = null;
+
+        _selectedUserId = Guid.TryParse(args.Value?.ToString(), out var userId)
+            ? userId
+            : null;
+
+        RefreshSelectedBranches();
+    }
+
+    private void RefreshSelectedBranches()
+    {
+        var user = SelectedUser;
+        var availableIds = _branches.Select(x => x.Id).ToHashSet();
+
+        if (user is null)
+        {
+            _selectedBranchIds = [];
+            return;
+        }
+
+        _selectedBranchIds = user.AdditionalBranchIds
+            .Where(id => availableIds.Contains(id) && id != user.BranchId)
+            .ToHashSet();
+    }
+
+    private void ToggleBranch(Guid branchId, ChangeEventArgs args)
+    {
+        if (SelectedUser is not { } user || user.BranchId == branchId || _saving)
+        {
+            return;
+        }
+
+        if (args.Value is bool isChecked && isChecked)
+        {
+            _selectedBranchIds.Add(branchId);
+        }
+        else
+        {
+            _selectedBranchIds.Remove(branchId);
+        }
+
+        _successMessage = null;
+        _errorMessage = null;
+    }
+
+    private async Task SaveAccess()
+    {
+        var user = SelectedUser;
+        if (user is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            await UserAdministrationService.SetAdditionalBranchesAsync(
+                user.Id,
+                _selectedBranchIds.ToArray());
+
+            _successMessage = "Дополнительные филиалы сохранены.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string RoleLabel(string role) => role switch
+    {
+        Roles.Admin => "Администратор",
+        Roles.Moderator => "Модератор",
+        Roles.Dispatcher => "Диспетчер",
+        _ => role
+    };
+
+    private void ClearError() => _errorMessage = null;
+    private void ClearSuccess() => _successMessage = null;
+}

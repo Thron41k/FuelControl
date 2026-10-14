@@ -178,7 +178,7 @@
                 </AuthorizeView>
 
 
-                <AuthorizeView Roles="@Roles.Admin">
+                <AuthorizeView Roles="@Roles.ModeratorOrHigher" Context="administrationContext">
 
                     <li class="nav-item dropdown">
 
@@ -199,19 +199,21 @@
 
                         <ul class="dropdown-menu"
                             aria-labelledby="administrationDropdown">
-
+                            <AuthorizeView Roles="@Roles.Admin" Context="adminContext">
+                                <li>
+                                    <NavLink class="dropdown-item"
+                                             + href="/administration/users">
+                                        <span class="bi bi-people me-1"></span>Пользователи
+                                    </NavLink>
+                                </li>
+                            </AuthorizeView>
                             <li>
-
                                 <NavLink class="dropdown-item"
-                                         href="/administration/users">
-
+                                         href="/administration/branch-access">
                                     <span class="bi bi-people me-1">
                                     </span>
-
-                                    Пользователи
-
+                                    Доступ к филиалам
                                 </NavLink>
-
                             </li>
 
                         </ul>

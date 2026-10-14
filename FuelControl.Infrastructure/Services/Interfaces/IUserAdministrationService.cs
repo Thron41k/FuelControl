@@ -1,10 +1,13 @@
-﻿using FuelControl.Infrastructure.Services.Models;
+using FuelControl.Infrastructure.Services.Models;
 
 namespace FuelControl.Infrastructure.Services.Interfaces;
 
 public interface IUserAdministrationService
 {
     Task<IReadOnlyList<AdminUserModel>> GetAllAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AdminUserModel>> GetForBranchAccessAsync(
         CancellationToken cancellationToken = default);
 
     Task<Guid> CreateAsync(
@@ -23,6 +26,11 @@ public interface IUserAdministrationService
         string role,
         CancellationToken cancellationToken = default);
 
+    Task SetAdditionalBranchesAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> branchIds,
+        CancellationToken cancellationToken = default);
+
     Task ResetPasswordAsync(
         Guid userId,
         string password,
@@ -31,14 +39,5 @@ public interface IUserAdministrationService
     Task SetLockedAsync(
         Guid userId,
         bool locked,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<AdminUserModel>>
-        GetForBranchAccessAsync(
-            CancellationToken cancellationToken = default);
-
-    Task SetAdditionalBranchesAsync(
-        Guid userId,
-        IReadOnlyCollection<Guid> branchIds,
         CancellationToken cancellationToken = default);
 }
