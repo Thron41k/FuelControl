@@ -304,17 +304,6 @@ public sealed class UserAdministrationService(
                 : "Не удалось разблокировать пользователя.");
     }
 
-    public Task<IReadOnlyList<AdminUserModel>> GetForBranchAccessAsync(CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task SetAdditionalBranchesAsync(Guid userId, IReadOnlyCollection<Guid> branchIds,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
     private async Task EnsureAdminAsync()
     {
         if (!currentUserService.IsAuthenticated)
